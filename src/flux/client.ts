@@ -53,21 +53,21 @@ export class FluxClient {
     return suffix ? `${base}${suffix}` : base;
   }
 
-  async listResources(folderPath: string, params?: Record<string, any>): Promise<any> {
+  async listResources<T = any>(folderPath: string, params?: Record<string, any>): Promise<T> {
     const path = this.buildPath(folderPath);
     return this.transport.request('GET', path, { params });
   }
 
-  async getResource(
+  async getResource<T = any>(
     folderPath: string,
     resourceKey: string,
     params?: Record<string, any>,
-  ): Promise<any> {
+  ): Promise<T> {
     const path = this.buildPath(folderPath, `/${resourceKey}`);
     return this.transport.request('GET', path, { params });
   }
 
-  async search(folderPath: string, body: Record<string, any>): Promise<any> {
+  async search<T = any>(folderPath: string, body: Record<string, any>): Promise<T> {
     const path = this.buildPath(folderPath, '/_search');
     return this.transport.request('POST', path, { jsonBody: body });
   }

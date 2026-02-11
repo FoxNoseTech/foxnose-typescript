@@ -28,16 +28,8 @@ describe('managementPaths', () => {
     );
   });
 
-  it('foldersRoot', () => {
-    expect(paths.foldersRoot()).toBe('/v1/env-abc/folders');
-  });
-
   it('foldersTreeRoot', () => {
     expect(paths.foldersTreeRoot()).toBe('/v1/env-abc/folders/tree');
-  });
-
-  it('folderRoot', () => {
-    expect(paths.folderRoot('f1')).toBe('/v1/env-abc/folders/f1');
   });
 
   it('folderVersionsBase', () => {

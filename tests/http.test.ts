@@ -345,6 +345,27 @@ describe('HttpTransport', () => {
     expect(url).not.toContain('c=');
   });
 
+  it('signing path filters null/undefined params same as URL', async () => {
+    let capturedPath = '';
+    const auth = {
+      buildHeaders: (req: any) => {
+        capturedPath = req.path;
+        return {};
+      },
+    };
+    const fetchMock = mockFetch([{ status: 200, body: {} }]);
+    globalThis.fetch = fetchMock;
+
+    const transport = new HttpTransport({ config: baseConfig, auth });
+    await transport.request('GET', '/test', {
+      params: { a: 'yes', b: null, c: undefined },
+    });
+
+    expect(capturedPath).toBe('/test?a=yes');
+    expect(capturedPath).not.toContain('null');
+    expect(capturedPath).not.toContain('undefined');
+  });
+
   it('handles non-JSON error response body', async () => {
     globalThis.fetch = vi.fn(async () =>
       new Response('Plain text error', { status: 500 }),

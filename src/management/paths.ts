@@ -15,10 +15,8 @@ export function managementPaths(environmentKey: string) {
       `/organizations/${orgKey}/projects/${projectKey}/environments/${envKey}`,
 
     // Folder paths
-    foldersRoot: () => `/v1/${environmentKey}/folders`,
     foldersTreeRoot: () => `/v1/${environmentKey}/folders/tree`,
     foldersTreeItem: () => `/v1/${environmentKey}/folders/tree/folder`,
-    folderRoot: (folderKey: string) => `/v1/${environmentKey}/folders/${folderKey}`,
     folderVersionsBase: (folderKey: string) =>
       `/v1/${environmentKey}/folders/${folderKey}/model/versions`,
     folderSchemaTree: (folderKey: string, versionKey: string) =>

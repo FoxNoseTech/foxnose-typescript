@@ -10,7 +10,7 @@ export type { AuthStrategy, RequestData, TokenProvider } from './auth/index.js';
 
 // Config
 export type { FoxnoseConfig, RetryConfig } from './config.js';
-export { createConfig, DEFAULT_RETRY_CONFIG, DEFAULT_USER_AGENT } from './config.js';
+export { createConfig, DEFAULT_RETRY_CONFIG, DEFAULT_USER_AGENT, SDK_VERSION } from './config.js';
 
 // Errors
 export {
@@ -75,6 +75,11 @@ export type {
   PlanDetails,
   OrganizationPlanStatus,
   OrganizationUsage,
+  UnitsUsage,
+  StorageUsage,
+  UsageMetric,
+  UsageBreakdown,
+  CurrentUsage,
   BatchUpsertItem,
   BatchItemError,
   BatchUpsertResult,
@@ -96,4 +101,4 @@ export type {
 
 export { resolveKey } from './management/models.js';
 
-export const VERSION = '0.1.0';
+export { SDK_VERSION as VERSION } from './config.js';

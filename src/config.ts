@@ -19,7 +19,9 @@ export const DEFAULT_RETRY_CONFIG: Readonly<RetryConfig> = {
   methods: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'],
 };
 
-export const DEFAULT_USER_AGENT = 'foxnose-sdk-js/0.1.0';
+export const SDK_VERSION = '0.1.0';
+
+export const DEFAULT_USER_AGENT = `foxnose-sdk-js/${SDK_VERSION}`;
 
 /**
  * General transport-level configuration shared by all clients.

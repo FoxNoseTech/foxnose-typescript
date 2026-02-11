@@ -95,7 +95,7 @@ export class HttpTransport {
     const requestData: RequestData = {
       method: method.toUpperCase(),
       url,
-      path: path + (options?.params ? `?${new URLSearchParams(options.params as Record<string, string>).toString()}` : ''),
+      path: this.buildSigningPath(path, options?.params),
       body,
     };
 
@@ -113,6 +113,20 @@ export class HttpTransport {
     return { url, init, body };
   }
 
+  private buildSigningPath(path: string, params?: Record<string, any>): string {
+    if (!params || Object.keys(params).length === 0) {
+      return path;
+    }
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null) {
+        searchParams.append(key, String(value));
+      }
+    }
+    const qs = searchParams.toString();
+    return qs ? `${path}?${qs}` : path;
+  }
+
   private shouldRetry(method: string, statusCode: number): boolean {
     if (!this.retry.methods.includes(method.toUpperCase())) {
       return false;
@@ -128,7 +142,8 @@ export class HttpTransport {
       }
       return 0;
     }
-    return this.retry.backoffFactor * Math.pow(2, Math.max(attempt - 1, 0)) * 1000;
+    const base = this.retry.backoffFactor * Math.pow(2, Math.max(attempt - 1, 0)) * 1000;
+    return base * (0.5 + Math.random() * 0.5);
   }
 
   private async maybeDecodeResponse(response: Response, parseJson: boolean): Promise<any> {
