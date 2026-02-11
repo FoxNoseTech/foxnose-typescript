@@ -44,11 +44,14 @@
     "headless-cms",
     "content-management",
     "api-client",
-    "sdk"
+    "sdk",
+    "llm",
+    "rag",
+    "vector-search"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/foxnose/ts-sdk.git"
+    "url": "https://github.com/FoxNoseTech/foxnose-typescript.git"
   },
   "packageManager": "pnpm@10.29.2",
   "homepage": "https://foxnose.net",
