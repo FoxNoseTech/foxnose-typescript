@@ -362,7 +362,7 @@ export class ManagementClient {
     payload: Record<string, any>,
   ): Promise<RolePermission> {
     const key = resolveKey(roleKey);
-    return this.request('PUT', `${this.paths.rolePermissionsRoot(key)}/`, {
+    return this.request('POST', `${this.paths.rolePermissionsRoot(key)}/`, {
       jsonBody: payload,
     });
   }
@@ -372,7 +372,8 @@ export class ManagementClient {
     contentType: string,
   ): Promise<void> {
     const key = resolveKey(roleKey);
-    await this.request('DELETE', `${this.paths.rolePermissionsRoot(key)}/${contentType}/`, {
+    await this.request('DELETE', `${this.paths.rolePermissionsRoot(key)}/`, {
+      params: { content_type: contentType },
       parseJson: false,
     });
   }
@@ -382,10 +383,10 @@ export class ManagementClient {
     permissions: Array<Record<string, any>>,
   ): Promise<RolePermission[]> {
     const key = resolveKey(roleKey);
-    const payload = await this.request('PUT', `${this.paths.rolePermissionsBatch(key)}/`, {
+    const payload = await this.request('POST', `${this.paths.rolePermissionsBatch(key)}/`, {
       jsonBody: permissions,
     });
-    return Array.isArray(payload) ? payload : [payload];
+    return Array.isArray(payload) ? payload : [];
   }
 
   // Management permission objects
@@ -467,7 +468,7 @@ export class ManagementClient {
     payload: Record<string, any>,
   ): Promise<RolePermission> {
     const key = resolveKey(roleKey);
-    return this.request('PUT', `${this.paths.fluxRolePermissionsRoot(key)}/`, {
+    return this.request('POST', `${this.paths.fluxRolePermissionsRoot(key)}/`, {
       jsonBody: payload,
     });
   }
@@ -476,8 +477,8 @@ export class ManagementClient {
     const key = resolveKey(roleKey);
     await this.request(
       'DELETE',
-      `${this.paths.fluxRolePermissionsRoot(key)}/${contentType}/`,
-      { parseJson: false },
+      `${this.paths.fluxRolePermissionsRoot(key)}/`,
+      { params: { content_type: contentType }, parseJson: false },
     );
   }
 
@@ -486,10 +487,10 @@ export class ManagementClient {
     permissions: Array<Record<string, any>>,
   ): Promise<RolePermission[]> {
     const key = resolveKey(roleKey);
-    const payload = await this.request('PUT', `${this.paths.fluxRolePermissionsBatch(key)}/`, {
+    const payload = await this.request('POST', `${this.paths.fluxRolePermissionsBatch(key)}/`, {
       jsonBody: permissions,
     });
-    return Array.isArray(payload) ? payload : [payload];
+    return Array.isArray(payload) ? payload : [];
   }
 
   // Flux permission objects
@@ -532,12 +533,14 @@ export class ManagementClient {
   // ------------------------------------------------------------------ //
 
   async listFolders(params?: Record<string, any>): Promise<FolderList> {
-    return this.request('GET', `${this.paths.foldersRoot()}/`, { params });
+    return this.request('GET', `${this.paths.foldersTreeRoot()}/`, { params });
   }
 
   async getFolder(folderKey: FolderRef): Promise<FolderSummary> {
     const key = resolveKey(folderKey);
-    return this.request('GET', `${this.paths.folderRoot(key)}/`);
+    return this.request('GET', `${this.paths.foldersTreeItem()}/`, {
+      params: { key },
+    });
   }
 
   async getFolderByPath(path: string): Promise<FolderSummary> {
@@ -565,12 +568,18 @@ export class ManagementClient {
     payload: Record<string, any>,
   ): Promise<FolderSummary> {
     const key = resolveKey(folderKey);
-    return this.request('PUT', `${this.paths.folderRoot(key)}/`, { jsonBody: payload });
+    return this.request('PUT', `${this.paths.foldersTreeItem()}/`, {
+      params: { key },
+      jsonBody: payload,
+    });
   }
 
   async deleteFolder(folderKey: FolderRef): Promise<void> {
     const key = resolveKey(folderKey);
-    await this.request('DELETE', `${this.paths.folderRoot(key)}/`, { parseJson: false });
+    await this.request('DELETE', `${this.paths.foldersTreeItem()}/`, {
+      params: { key },
+      parseJson: false,
+    });
   }
 
   // ------------------------------------------------------------------ //
@@ -687,7 +696,8 @@ export class ManagementClient {
     const vKey = resolveKey(versionKey);
     return this.request(
       'GET',
-      `${this.paths.folderSchemaTree(fKey, vKey)}/${fieldPath}/`,
+      `${this.paths.folderSchemaTree(fKey, vKey)}/field/`,
+      { params: { path: fieldPath } },
     );
   }
 
@@ -701,8 +711,8 @@ export class ManagementClient {
     const vKey = resolveKey(versionKey);
     return this.request(
       'PUT',
-      `${this.paths.folderSchemaTree(fKey, vKey)}/${fieldPath}/`,
-      { jsonBody: payload },
+      `${this.paths.folderSchemaTree(fKey, vKey)}/field/`,
+      { params: { path: fieldPath }, jsonBody: payload },
     );
   }
 
@@ -715,8 +725,8 @@ export class ManagementClient {
     const vKey = resolveKey(versionKey);
     await this.request(
       'DELETE',
-      `${this.paths.folderSchemaTree(fKey, vKey)}/${fieldPath}/`,
-      { parseJson: false },
+      `${this.paths.folderSchemaTree(fKey, vKey)}/field/`,
+      { params: { path: fieldPath }, parseJson: false },
     );
   }
 
@@ -864,7 +874,8 @@ export class ManagementClient {
     const vKey = resolveKey(versionKey);
     return this.request(
       'GET',
-      `${this.paths.componentSchemaTree(cKey, vKey)}/${fieldPath}/`,
+      `${this.paths.componentSchemaTree(cKey, vKey)}/field/`,
+      { params: { path: fieldPath } },
     );
   }
 
@@ -878,8 +889,8 @@ export class ManagementClient {
     const vKey = resolveKey(versionKey);
     return this.request(
       'PUT',
-      `${this.paths.componentSchemaTree(cKey, vKey)}/${fieldPath}/`,
-      { jsonBody: payload },
+      `${this.paths.componentSchemaTree(cKey, vKey)}/field/`,
+      { params: { path: fieldPath }, jsonBody: payload },
     );
   }
 
@@ -892,8 +903,8 @@ export class ManagementClient {
     const vKey = resolveKey(versionKey);
     await this.request(
       'DELETE',
-      `${this.paths.componentSchemaTree(cKey, vKey)}/${fieldPath}/`,
-      { parseJson: false },
+      `${this.paths.componentSchemaTree(cKey, vKey)}/field/`,
+      { params: { path: fieldPath }, parseJson: false },
     );
   }
 
@@ -921,14 +932,18 @@ export class ManagementClient {
     options?: { component?: ComponentRef; externalId?: string },
   ): Promise<ResourceSummary> {
     const key = resolveKey(folderKey);
-    const body = { ...payload };
+    const params: Record<string, string> = {};
     if (options?.component) {
-      body.component = resolveKey(options.component);
+      params.component = resolveKey(options.component);
     }
+    const body = { ...payload };
     if (options?.externalId) {
       body.external_id = options.externalId;
     }
-    return this.request('POST', `${this.paths.resourceBase(key)}/`, { jsonBody: body });
+    return this.request('POST', `${this.paths.resourceBase(key)}/`, {
+      params: Object.keys(params).length ? params : undefined,
+      jsonBody: body,
+    });
   }
 
   async upsertResource(
@@ -937,11 +952,14 @@ export class ManagementClient {
     options: { externalId: string; component?: ComponentRef },
   ): Promise<ResourceSummary> {
     const key = resolveKey(folderKey);
-    const body: Record<string, any> = { ...payload, external_id: options.externalId };
+    const params: Record<string, string> = { external_id: options.externalId };
     if (options.component) {
-      body.component = resolveKey(options.component);
+      params.component = resolveKey(options.component);
     }
-    return this.request('PUT', `${this.paths.resourceBase(key)}/`, { jsonBody: body });
+    return this.request('PUT', `${this.paths.resourceBase(key)}/`, {
+      params,
+      jsonBody: payload,
+    });
   }
 
   async batchUpsertResources(
@@ -955,6 +973,12 @@ export class ManagementClient {
   ): Promise<BatchUpsertResult> {
     const fKey = resolveKey(folderKey);
     const maxConcurrency = options?.maxConcurrency ?? 5;
+    if (maxConcurrency < 1) {
+      throw new Error('maxConcurrency must be at least 1');
+    }
+    if (items.length === 0) {
+      return { succeeded: [], failed: [] };
+    }
     const failFast = options?.failFast ?? false;
     const onProgress = options?.onProgress;
 
@@ -966,17 +990,14 @@ export class ManagementClient {
 
     const processItem = async (index: number, item: BatchUpsertItem): Promise<void> => {
       try {
-        const body: Record<string, any> = {
-          ...item.payload,
-          external_id: item.external_id,
-        };
+        const params: Record<string, string> = { external_id: item.external_id };
         if (item.component) {
-          body.component = item.component;
+          params.component = item.component;
         }
         const result: ResourceSummary = await this.request(
           'PUT',
           `${this.paths.resourceBase(fKey)}/`,
-          { jsonBody: body },
+          { params, jsonBody: item.payload },
         );
         succeeded.push(result);
       } catch (err) {
@@ -1000,8 +1021,8 @@ export class ManagementClient {
       const batch = queue.slice(i, i + maxConcurrency);
       try {
         await Promise.all(batch.map(([index, item]) => processItem(index, item)));
-      } catch {
-        if (failFast) break;
+      } catch (err) {
+        if (failFast) throw err;
       }
       i += maxConcurrency;
     }
@@ -1016,9 +1037,11 @@ export class ManagementClient {
   ): Promise<ResourceSummary> {
     const fKey = resolveKey(folderKey);
     const rKey = resolveKey(resourceKey);
-    return this.request('PUT', `${this.paths.resourceBase(fKey)}/${rKey}/`, {
+    await this.request('PUT', `${this.paths.resourceBase(fKey)}/${rKey}/`, {
       jsonBody: payload,
+      parseJson: false,
     });
+    return this.getResource(fKey, rKey);
   }
 
   async deleteResource(folderKey: FolderRef, resourceKey: ResourceRef): Promise<void> {
@@ -1309,8 +1332,8 @@ export class ManagementClient {
       body.protection_reason = options.protectionReason;
     }
     return this.request(
-      'POST',
-      `${this.paths.environmentRoot(oKey, pKey, eKey)}/protect/`,
+      'PATCH',
+      `${this.paths.environmentRoot(oKey, pKey, eKey)}/protection/`,
       { jsonBody: body },
     );
   }
@@ -1320,12 +1343,8 @@ export class ManagementClient {
     projectKey: ProjectRef,
     envKey: EnvironmentRef,
   ): Promise<EnvironmentSummary> {
-    const oKey = resolveKey(orgKey);
-    const pKey = resolveKey(projectKey);
-    const eKey = resolveKey(envKey);
-    return this.request(
-      'POST',
-      `${this.paths.environmentRoot(oKey, pKey, eKey)}/unprotect/`,
-    );
+    return this.updateEnvironmentProtection(orgKey, projectKey, envKey, {
+      protectionLevel: 'none',
+    });
   }
 }

@@ -306,10 +306,14 @@ describe('ManagementClient', () => {
       expect(result).toEqual(perms);
     });
 
-    it('deleteManagementRolePermission', async () => {
-      globalThis.fetch = vi.fn(async () => new Response(null, { status: 204 }));
+    it('deleteManagementRolePermission uses content_type query param', async () => {
+      const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+      globalThis.fetch = fetchMock;
       const client = createClient();
       await client.deleteManagementRolePermission('role-1', 'folder');
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).toContain('content_type=folder');
+      expect(url).not.toContain('/folder/');
     });
   });
 
@@ -387,10 +391,14 @@ describe('ManagementClient', () => {
       expect(await client.replaceFluxRolePermissions('fr-1', perms)).toEqual(perms);
     });
 
-    it('deleteFluxRolePermission', async () => {
-      globalThis.fetch = vi.fn(async () => new Response(null, { status: 204 }));
+    it('deleteFluxRolePermission uses content_type query param', async () => {
+      const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+      globalThis.fetch = fetchMock;
       const client = createClient();
       await client.deleteFluxRolePermission('fr-1', 'folder');
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).toContain('content_type=folder');
+      expect(url).not.toContain('/folder/');
     });
   });
 
@@ -423,7 +431,7 @@ describe('ManagementClient', () => {
       const client = createClient();
       const result = await client.listFolders();
       expect(result).toEqual(data);
-      expect(fetchMock.mock.calls[0][0]).toContain('/v1/env-123/folders/');
+      expect(fetchMock.mock.calls[0][0]).toContain('/v1/env-123/folders/tree/');
     });
 
     it('getFolder', async () => {
@@ -432,7 +440,8 @@ describe('ManagementClient', () => {
       const client = createClient();
       const result = await client.getFolder('f1');
       expect(result).toEqual(folder);
-      expect(fetchMock.mock.calls[0][0]).toContain('/v1/env-123/folders/f1/');
+      expect(fetchMock.mock.calls[0][0]).toContain('/v1/env-123/folders/tree/folder/');
+      expect(fetchMock.mock.calls[0][0]).toContain('key=f1');
     });
 
     it('getFolder with FolderSummary object', async () => {
@@ -690,9 +699,11 @@ describe('ManagementClient', () => {
         component: 'comp-1',
         externalId: 'ext-1',
       });
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).toContain('component=comp-1');
       const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
-      expect(body.component).toBe('comp-1');
       expect(body.external_id).toBe('ext-1');
+      expect(body.component).toBeUndefined();
     });
 
     it('createResource without options', async () => {
@@ -708,8 +719,10 @@ describe('ManagementClient', () => {
       const fetchMock = setupMockFetch(resource);
       const client = createClient();
       await client.upsertResource('f1', { data: {} }, { externalId: 'ext-1' });
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).toContain('external_id=ext-1');
       const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
-      expect(body.external_id).toBe('ext-1');
+      expect(body.external_id).toBeUndefined();
     });
 
     it('upsertResource with component', async () => {
@@ -720,8 +733,10 @@ describe('ManagementClient', () => {
         externalId: 'ext-1',
         component: 'comp-1',
       });
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).toContain('component=comp-1');
       const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
-      expect(body.component).toBe('comp-1');
+      expect(body.component).toBeUndefined();
     });
 
     it('updateResource', async () => {
@@ -809,11 +824,12 @@ describe('ManagementClient', () => {
         { external_id: 'ext-1', payload: { title: 'A' } },
         { external_id: 'ext-2', payload: { title: 'B' } },
       ];
-      const result = await client.batchUpsertResources('f1', items, {
-        maxConcurrency: 1,
-        failFast: true,
-      });
-      expect(result.failed.length).toBe(1);
+      await expect(
+        client.batchUpsertResources('f1', items, {
+          maxConcurrency: 1,
+          failFast: true,
+        }),
+      ).rejects.toThrow();
     });
 
     it('batchUpsertResources with component in items', async () => {
@@ -823,8 +839,8 @@ describe('ManagementClient', () => {
         { external_id: 'ext-1', payload: { title: 'A' }, component: 'comp-1' },
       ];
       await client.batchUpsertResources('f1', items);
-      const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
-      expect(body.component).toBe('comp-1');
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).toContain('component=comp-1');
     });
   });
 
@@ -990,7 +1006,7 @@ describe('ManagementClient', () => {
       expect(body.is_enabled).toBe(true);
     });
 
-    it('updateEnvironmentProtection', async () => {
+    it('updateEnvironmentProtection uses PATCH /protection/', async () => {
       const env = { key: 'env-1', protection_level: 'locked' };
       const fetchMock = setupMockFetch(env);
       const client = createClient();
@@ -998,15 +1014,22 @@ describe('ManagementClient', () => {
         protectionLevel: 'locked',
         protectionReason: 'maintenance',
       });
-      expect(fetchMock.mock.calls[0][0]).toContain('/protect/');
+      expect(fetchMock.mock.calls[0][0]).toContain('/protection/');
+      expect(fetchMock.mock.calls[0][1]?.method).toBe('PATCH');
+      const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+      expect(body.protection_level).toBe('locked');
+      expect(body.protection_reason).toBe('maintenance');
     });
 
-    it('clearEnvironmentProtection', async () => {
+    it('clearEnvironmentProtection delegates to updateEnvironmentProtection with none', async () => {
       const env = { key: 'env-1', protection_level: null };
       const fetchMock = setupMockFetch(env);
       const client = createClient();
       await client.clearEnvironmentProtection('org-1', 'p1', 'env-1');
-      expect(fetchMock.mock.calls[0][0]).toContain('/unprotect/');
+      expect(fetchMock.mock.calls[0][0]).toContain('/protection/');
+      expect(fetchMock.mock.calls[0][1]?.method).toBe('PATCH');
+      const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+      expect(body.protection_level).toBe('none');
     });
   });
 

@@ -57,6 +57,10 @@ export interface FolderSummary {
   parent?: string | null;
   mode?: string | null;
   path?: string | null;
+  auto_remove_revisions?: number | null;
+  auto_remove_schema_versions?: number | null;
+  embedding_model?: string | null;
+  embedding_dimension?: number | null;
 }
 
 export type FolderList = PaginatedResponse<FolderSummary>;
