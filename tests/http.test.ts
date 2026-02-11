@@ -393,6 +393,25 @@ describe('HttpTransport', () => {
     expect(init?.body).toEqual(content);
   });
 
+  it('does not retry transport errors for non-retryable methods', async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error('Connection reset');
+    });
+
+    const transport = new HttpTransport({
+      config: baseConfig,
+      retryConfig: {
+        attempts: 3,
+        backoffFactor: 0,
+        statusCodes: [],
+        methods: ['GET'],
+      },
+    });
+
+    await expect(transport.request('POST', '/test')).rejects.toThrow(FoxnoseTransportError);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('handles transport error with non-Error thrown', async () => {
     globalThis.fetch = vi.fn(async () => {
       throw 'string-error';

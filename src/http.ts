@@ -168,7 +168,7 @@ export class HttpTransport {
         response = await fetch(url, init);
       } catch (err) {
         clearTimeout(timeoutId);
-        const delay = this.handleTransportError(err, attempt);
+        const delay = this.handleTransportError(err, method, attempt);
         if (delay > 0) {
           await this.sleep(delay);
         }
@@ -194,8 +194,10 @@ export class HttpTransport {
     throw new FoxnoseTransportError('All retry attempts exhausted');
   }
 
-  private handleTransportError(err: unknown, attempt: number): number {
-    if (attempt >= this.retry.attempts) {
+  private handleTransportError(err: unknown, method: string, attempt: number): number {
+    const canRetry =
+      this.retry.methods.includes(method.toUpperCase()) && attempt < this.retry.attempts;
+    if (!canRetry) {
       const message = err instanceof Error ? err.message : String(err);
       throw new FoxnoseTransportError(message);
     }
