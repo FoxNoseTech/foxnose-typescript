@@ -1,6 +1,6 @@
 {
   "name": "@foxnose/sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Official FoxNose SDK for TypeScript and JavaScript",
   "license": "Apache-2.0",
   "type": "module",
