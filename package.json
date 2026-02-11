@@ -50,6 +50,7 @@
     "type": "git",
     "url": "https://github.com/foxnose/ts-sdk.git"
   },
+  "packageManager": "pnpm@10.29.2",
   "homepage": "https://foxnose.net",
   "devDependencies": {
     "@types/node": "^20.0.0",
