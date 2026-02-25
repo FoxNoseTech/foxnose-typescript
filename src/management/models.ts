@@ -271,6 +271,10 @@ export interface APIFolderSummary {
   api?: string | null;
   path?: string | null;
   allowed_methods?: string[] | null;
+  description_get_one?: string | null;
+  description_get_many?: string | null;
+  description_search?: string | null;
+  description_schema?: string | null;
   created_at?: string | null;
 }
 
@@ -434,7 +438,5 @@ export function resolveKey(value: string | { key: string }): string {
   if (value && typeof value === 'object' && 'key' in value && typeof value.key === 'string') {
     return value.key;
   }
-  throw new TypeError(
-    `Expected a string or an object with a 'key' attribute, got ${typeof value}`,
-  );
+  throw new TypeError(`Expected a string or an object with a 'key' attribute, got ${typeof value}`);
 }

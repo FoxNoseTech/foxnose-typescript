@@ -9,9 +9,7 @@ const dummyAuth: AuthStrategy = {
 };
 
 function setupMockFetch(response: any = {}, status = 200) {
-  const fetchMock = vi.fn(async () =>
-    new Response(JSON.stringify(response), { status }),
-  );
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify(response), { status }));
   globalThis.fetch = fetchMock;
   return fetchMock;
 }
@@ -40,9 +38,9 @@ describe('ManagementClient', () => {
 
   describe('constructor', () => {
     it('throws on empty environmentKey', () => {
-      expect(
-        () => new ManagementClient({ environmentKey: '', auth: dummyAuth }),
-      ).toThrow('environmentKey must be provided');
+      expect(() => new ManagementClient({ environmentKey: '', auth: dummyAuth })).toThrow(
+        'environmentKey must be provided',
+      );
     });
 
     it('uses default baseUrl', () => {
@@ -237,16 +235,59 @@ describe('ManagementClient', () => {
     });
 
     it('addApiFolder', async () => {
-      const folder = { folder: 'f1', api: 'api-1' };
+      const folder = {
+        folder: 'f1',
+        api: 'api-1',
+        description_get_one: 'Get one article by key',
+        description_get_many: 'List published articles',
+        description_search: 'Search published articles',
+        description_schema: 'Read article schema',
+      };
       const fetchMock = setupMockFetch(folder);
       const client = createClient();
       const result = await client.addApiFolder('api-1', 'f1', {
-        allowedMethods: ['get_one', 'get_many'],
+        allowedMethods: [],
+        descriptionGetOne: 'Get one article by key',
+        descriptionGetMany: 'List published articles',
+        descriptionSearch: 'Search published articles',
+        descriptionSchema: 'Read article schema',
       });
       expect(result).toEqual(folder);
       const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
       expect(body.folder).toBe('f1');
-      expect(body.allowed_methods).toEqual(['get_one', 'get_many']);
+      expect(body.allowed_methods).toEqual([]);
+      expect(body.description_get_one).toBe('Get one article by key');
+      expect(body.description_get_many).toBe('List published articles');
+      expect(body.description_search).toBe('Search published articles');
+      expect(body.description_schema).toBe('Read article schema');
+    });
+
+    it('updateApiFolder supports route descriptions', async () => {
+      const folder = {
+        folder: 'f1',
+        api: 'api-1',
+        allowed_methods: ['get_many'],
+        description_get_one: '',
+        description_get_many: 'Public article feed',
+        description_search: 'Search public feed',
+        description_schema: 'Read feed schema',
+      };
+      const fetchMock = setupMockFetch(folder);
+      const client = createClient();
+      const result = await client.updateApiFolder('api-1', 'f1', {
+        allowedMethods: ['get_many'],
+        descriptionGetOne: '',
+        descriptionGetMany: 'Public article feed',
+        descriptionSearch: 'Search public feed',
+        descriptionSchema: 'Read feed schema',
+      });
+      expect(result).toEqual(folder);
+      const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+      expect(body.allowed_methods).toEqual(['get_many']);
+      expect(body.description_get_one).toBe('');
+      expect(body.description_get_many).toBe('Public article feed');
+      expect(body.description_search).toBe('Search public feed');
+      expect(body.description_schema).toBe('Read feed schema');
     });
 
     it('removeApiFolder', async () => {
@@ -664,7 +705,9 @@ describe('ManagementClient', () => {
       const field = { key: 'text', type: 'text' };
       setupMockFetch(field);
       const client = createClient();
-      expect(await client.createComponentField('c1', 'cv1', { name: 'Text', type: 'text' })).toEqual(field);
+      expect(
+        await client.createComponentField('c1', 'cv1', { name: 'Text', type: 'text' }),
+      ).toEqual(field);
     });
 
     it('deleteComponentField', async () => {
@@ -695,10 +738,14 @@ describe('ManagementClient', () => {
       const resource = { key: 'r-new' };
       const fetchMock = setupMockFetch(resource);
       const client = createClient();
-      await client.createResource('f1', { data: {} }, {
-        component: 'comp-1',
-        externalId: 'ext-1',
-      });
+      await client.createResource(
+        'f1',
+        { data: {} },
+        {
+          component: 'comp-1',
+          externalId: 'ext-1',
+        },
+      );
       const url = fetchMock.mock.calls[0][0] as string;
       expect(url).toContain('component=comp-1');
       const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
@@ -729,10 +776,14 @@ describe('ManagementClient', () => {
       const resource = { key: 'r1' };
       const fetchMock = setupMockFetch(resource);
       const client = createClient();
-      await client.upsertResource('f1', { data: {} }, {
-        externalId: 'ext-1',
-        component: 'comp-1',
-      });
+      await client.upsertResource(
+        'f1',
+        { data: {} },
+        {
+          externalId: 'ext-1',
+          component: 'comp-1',
+        },
+      );
       const url = fetchMock.mock.calls[0][0] as string;
       expect(url).toContain('component=comp-1');
       const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
@@ -835,9 +886,7 @@ describe('ManagementClient', () => {
     it('batchUpsertResources with component in items', async () => {
       const fetchMock = setupMockFetch({ key: 'r1' });
       const client = createClient();
-      const items = [
-        { external_id: 'ext-1', payload: { title: 'A' }, component: 'comp-1' },
-      ];
+      const items = [{ external_id: 'ext-1', payload: { title: 'A' }, component: 'comp-1' }];
       await client.batchUpsertResources('f1', items);
       const url = fetchMock.mock.calls[0][0] as string;
       expect(url).toContain('component=comp-1');
@@ -988,7 +1037,9 @@ describe('ManagementClient', () => {
 
       expect(await client.createEnvironment('org-1', 'p1', { name: 'Dev' })).toEqual(env);
       expect(await client.getEnvironment('org-1', 'p1', 'env-1')).toEqual(env);
-      expect(await client.updateEnvironment('org-1', 'p1', 'env-1', { name: 'Staging' })).toEqual(env);
+      expect(await client.updateEnvironment('org-1', 'p1', 'env-1', { name: 'Staging' })).toEqual(
+        env,
+      );
     });
 
     it('deleteEnvironment', async () => {

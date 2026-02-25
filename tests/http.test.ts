@@ -9,7 +9,9 @@ const baseConfig: FoxnoseConfig = {
   userAgent: 'test-agent/1.0',
 };
 
-function mockFetch(responses: Array<{ status: number; body?: any; headers?: Record<string, string> }>) {
+function mockFetch(
+  responses: Array<{ status: number; body?: any; headers?: Record<string, string> }>,
+) {
   let callIndex = 0;
   return vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => {
     const resp = responses[callIndex] ?? responses[responses.length - 1];
@@ -192,9 +194,7 @@ describe('HttpTransport', () => {
     });
 
     it('throws FoxnoseAPIError on 5xx (no retry for POST)', async () => {
-      const fetchMock = mockFetch([
-        { status: 500, body: { message: 'Internal error' } },
-      ]);
+      const fetchMock = mockFetch([{ status: 500, body: { message: 'Internal error' } }]);
       globalThis.fetch = fetchMock;
 
       const transport = new HttpTransport({ config: baseConfig });
@@ -218,10 +218,7 @@ describe('HttpTransport', () => {
 
   describe('retry logic', () => {
     it('retries on retryable status codes for GET', async () => {
-      const fetchMock = mockFetch([
-        { status: 503 },
-        { status: 200, body: { ok: true } },
-      ]);
+      const fetchMock = mockFetch([{ status: 503 }, { status: 200, body: { ok: true } }]);
       globalThis.fetch = fetchMock;
 
       const transport = new HttpTransport({
@@ -240,9 +237,7 @@ describe('HttpTransport', () => {
     });
 
     it('does not retry POST by default', async () => {
-      const fetchMock = mockFetch([
-        { status: 503, body: { message: 'Unavailable' } },
-      ]);
+      const fetchMock = mockFetch([{ status: 503, body: { message: 'Unavailable' } }]);
       globalThis.fetch = fetchMock;
 
       const transport = new HttpTransport({
@@ -367,9 +362,7 @@ describe('HttpTransport', () => {
   });
 
   it('handles non-JSON error response body', async () => {
-    globalThis.fetch = vi.fn(async () =>
-      new Response('Plain text error', { status: 500 }),
-    );
+    globalThis.fetch = vi.fn(async () => new Response('Plain text error', { status: 500 }));
 
     const transport = new HttpTransport({
       config: baseConfig,

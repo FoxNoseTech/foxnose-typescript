@@ -12,6 +12,7 @@ Official TypeScript SDK for the [FoxNose](https://foxnose.net/?utm_source=github
 - **Async-only API** built on native `fetch` (Node 18+)
 - **Automatic retries** with exponential backoff and Retry-After support
 - **Four auth strategies** — Anonymous, JWT, Simple key, and Secure (ECDSA P-256)
+- **Flux introspection** — discover route contracts with `/_router` and `/_schema`
 - **Zero dependencies** — uses only Node.js built-in modules
 - **Dual output** — ESM and CommonJS builds with full `.d.ts` declarations
 
@@ -87,7 +88,30 @@ const results = await client.search('articles', {
   size: 10,
 });
 
+// Discover available routes for this API prefix
+const router = await client.getRouter();
+console.log(router.routes.length);
+
+// Get live schema metadata for a folder route
+const schema = await client.getSchema('articles');
+console.log(schema.searchable_fields);
+
 client.close();
+```
+
+### API Folder Route Descriptions
+
+You can configure per-route descriptions when connecting a folder to an API.
+These descriptions are returned by Flux `/_router` introspection.
+
+```typescript
+await managementClient.addApiFolder(api.key, folder.key, {
+  allowedMethods: ['get_many', 'get_one'],
+  descriptionGetOne: 'Get one article by key',
+  descriptionGetMany: 'List published articles',
+  descriptionSearch: 'Search published articles',
+  descriptionSchema: 'Read article schema',
+});
 ```
 
 ## Authentication

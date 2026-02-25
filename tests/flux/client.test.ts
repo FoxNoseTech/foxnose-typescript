@@ -9,9 +9,7 @@ const dummyAuth: AuthStrategy = {
 };
 
 function setupMockFetch(response: any = {}, status = 200) {
-  const fetchMock = vi.fn(async () =>
-    new Response(JSON.stringify(response), { status }),
-  );
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify(response), { status }));
   globalThis.fetch = fetchMock;
   return fetchMock;
 }
@@ -135,6 +133,34 @@ describe('FluxClient', () => {
       expect(url).toBe('https://env-123.fxns.io/v1/articles/_search');
       expect(init?.method).toBe('POST');
       expect(JSON.parse(init?.body as string)).toEqual(body);
+    });
+  });
+
+  describe('introspection', () => {
+    it('getRouter fetches router catalog', async () => {
+      const data = { api: 'v1', routes: [] };
+      const fetchMock = setupMockFetch(data);
+      const client = createClient();
+      const result = await client.getRouter();
+
+      expect(result).toEqual(data);
+      expect(fetchMock.mock.calls[0][0]).toBe('https://env-123.fxns.io/v1/_router');
+    });
+
+    it('getSchema fetches folder schema', async () => {
+      const data = {
+        json_schema: { type: 'object' },
+        searchable_fields: ['title'],
+        non_searchable_fields: [],
+        path: '/v1/articles',
+        actions: ['get_many', 'get_one'],
+      };
+      const fetchMock = setupMockFetch(data);
+      const client = createClient();
+      const result = await client.getSchema('articles');
+
+      expect(result).toEqual(data);
+      expect(fetchMock.mock.calls[0][0]).toBe('https://env-123.fxns.io/v1/articles/_schema');
     });
   });
 

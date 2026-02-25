@@ -72,6 +72,16 @@ export class FluxClient {
     return this.transport.request('POST', path, { jsonBody: body });
   }
 
+  async getRouter<T = any>(): Promise<T> {
+    const path = `/${this.apiPrefix}/_router`;
+    return this.transport.request('GET', path);
+  }
+
+  async getSchema<T = any>(folderPath: string): Promise<T> {
+    const path = this.buildPath(folderPath, '/_schema');
+    return this.transport.request('GET', path);
+  }
+
   close(): void {
     this.transport.close();
   }
