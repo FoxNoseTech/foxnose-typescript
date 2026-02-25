@@ -11,7 +11,9 @@ function generateTestKeyPair() {
   });
   const privateKeyB64 = (privateKey as Buffer).toString('base64');
   // Extract a simple public key identifier (just use first 16 chars of base64)
-  const pubKeyB64 = Buffer.from(publicKey as string).toString('base64').substring(0, 16);
+  const pubKeyB64 = Buffer.from(publicKey as string)
+    .toString('base64')
+    .substring(0, 16);
   return { publicKey: pubKeyB64, privateKey: privateKeyB64 };
 }
 
@@ -116,9 +118,7 @@ describe('SecureKeyAuth', () => {
   });
 
   it('throws on empty privateKey', () => {
-    expect(() => new SecureKeyAuth('pubkey', '')).toThrow(
-      'publicKey and privateKey are required',
-    );
+    expect(() => new SecureKeyAuth('pubkey', '')).toThrow('publicKey and privateKey are required');
   });
 
   it('throws on invalid private key when signing', () => {

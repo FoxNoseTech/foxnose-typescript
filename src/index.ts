@@ -25,7 +25,11 @@ export { HttpTransport } from './http.js';
 
 // Management Client
 export { ManagementClient } from './management/index.js';
-export type { ManagementClientOptions } from './management/index.js';
+export type {
+  ApiFolderOptions,
+  ApiFolderRouteDescriptionOptions,
+  ManagementClientOptions,
+} from './management/index.js';
 
 // Flux Client
 export { FluxClient } from './flux/index.js';

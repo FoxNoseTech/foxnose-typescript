@@ -31,14 +31,12 @@ export function managementPaths(environmentKey: string) {
       `/v1/${environmentKey}/components/${componentKey}/model/versions/${versionKey}/schema/tree`,
 
     // Resource paths
-    resourceBase: (folderKey: string) =>
-      `/v1/${environmentKey}/folders/${folderKey}/resources`,
+    resourceBase: (folderKey: string) => `/v1/${environmentKey}/folders/${folderKey}/resources`,
     revisionBase: (folderKey: string, resourceKey: string) =>
       `/v1/${environmentKey}/folders/${folderKey}/resources/${resourceKey}/revisions`,
 
     // Management API key paths
-    managementApiKeysRoot: () =>
-      `/v1/${environmentKey}/permissions/management-api/api-keys`,
+    managementApiKeysRoot: () => `/v1/${environmentKey}/permissions/management-api/api-keys`,
     managementApiKeyRoot: (apiKey: string) =>
       `/v1/${environmentKey}/permissions/management-api/api-keys/${apiKey}`,
 

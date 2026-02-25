@@ -12,11 +12,7 @@ export class HttpTransport {
   private readonly auth: AuthStrategy;
   private readonly retry: RetryConfig;
 
-  constructor(options: {
-    config: FoxnoseConfig;
-    auth?: AuthStrategy;
-    retryConfig?: RetryConfig;
-  }) {
+  constructor(options: { config: FoxnoseConfig; auth?: AuthStrategy; retryConfig?: RetryConfig }) {
     this.config = options.config;
     this.auth = options.auth ?? new AnonymousAuth();
     this.retry = options.retryConfig ?? { ...DEFAULT_RETRY_CONFIG };

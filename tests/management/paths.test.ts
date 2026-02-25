@@ -65,15 +65,11 @@ describe('managementPaths', () => {
   });
 
   it('revisionBase', () => {
-    expect(paths.revisionBase('f1', 'r1')).toBe(
-      '/v1/env-abc/folders/f1/resources/r1/revisions',
-    );
+    expect(paths.revisionBase('f1', 'r1')).toBe('/v1/env-abc/folders/f1/resources/r1/revisions');
   });
 
   it('managementApiKeysRoot', () => {
-    expect(paths.managementApiKeysRoot()).toBe(
-      '/v1/env-abc/permissions/management-api/api-keys',
-    );
+    expect(paths.managementApiKeysRoot()).toBe('/v1/env-abc/permissions/management-api/api-keys');
   });
 
   it('fluxApiKeysRoot', () => {
@@ -89,9 +85,7 @@ describe('managementPaths', () => {
   });
 
   it('managementRolesRoot', () => {
-    expect(paths.managementRolesRoot()).toBe(
-      '/v1/env-abc/permissions/management-api/roles',
-    );
+    expect(paths.managementRolesRoot()).toBe('/v1/env-abc/permissions/management-api/roles');
   });
 
   it('rolePermissionsRoot', () => {

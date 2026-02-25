@@ -70,6 +70,17 @@ export interface ManagementClientOptions {
   defaultHeaders?: Record<string, string>;
 }
 
+export interface ApiFolderRouteDescriptionOptions {
+  descriptionGetOne?: string;
+  descriptionGetMany?: string;
+  descriptionSearch?: string;
+  descriptionSchema?: string;
+}
+
+export interface ApiFolderOptions extends ApiFolderRouteDescriptionOptions {
+  allowedMethods?: string[];
+}
+
 /**
  * Client for the FoxNose Management API.
  *
@@ -154,10 +165,7 @@ export class ManagementClient {
     return this.request('GET', `${this.paths.orgRoot(key)}/plan/`);
   }
 
-  async setOrganizationPlan(
-    orgKey: OrgRef,
-    planCode: string,
-  ): Promise<OrganizationPlanStatus> {
+  async setOrganizationPlan(orgKey: OrgRef, planCode: string): Promise<OrganizationPlanStatus> {
     const key = resolveKey(orgKey);
     return this.request('POST', `${this.paths.orgRoot(key)}/plan/${planCode}/`);
   }
@@ -272,13 +280,25 @@ export class ManagementClient {
   async addApiFolder(
     apiKey: APIRef,
     folderKey: FolderRef,
-    options?: { allowedMethods?: string[] },
+    options?: ApiFolderOptions,
   ): Promise<APIFolderSummary> {
     const aKey = resolveKey(apiKey);
     const fKey = resolveKey(folderKey);
     const body: Record<string, any> = { folder: fKey };
-    if (options?.allowedMethods) {
+    if (options?.allowedMethods !== undefined) {
       body.allowed_methods = options.allowedMethods;
+    }
+    if (options?.descriptionGetOne !== undefined) {
+      body.description_get_one = options.descriptionGetOne;
+    }
+    if (options?.descriptionGetMany !== undefined) {
+      body.description_get_many = options.descriptionGetMany;
+    }
+    if (options?.descriptionSearch !== undefined) {
+      body.description_search = options.descriptionSearch;
+    }
+    if (options?.descriptionSchema !== undefined) {
+      body.description_schema = options.descriptionSchema;
     }
     return this.request('POST', `${this.paths.apiFoldersRoot(aKey)}/`, { jsonBody: body });
   }
@@ -292,13 +312,25 @@ export class ManagementClient {
   async updateApiFolder(
     apiKey: APIRef,
     folderKey: FolderRef,
-    options?: { allowedMethods?: string[] },
+    options?: ApiFolderOptions,
   ): Promise<APIFolderSummary> {
     const aKey = resolveKey(apiKey);
     const fKey = resolveKey(folderKey);
     const body: Record<string, any> = {};
-    if (options?.allowedMethods) {
+    if (options?.allowedMethods !== undefined) {
       body.allowed_methods = options.allowedMethods;
+    }
+    if (options?.descriptionGetOne !== undefined) {
+      body.description_get_one = options.descriptionGetOne;
+    }
+    if (options?.descriptionGetMany !== undefined) {
+      body.description_get_many = options.descriptionGetMany;
+    }
+    if (options?.descriptionSearch !== undefined) {
+      body.description_search = options.descriptionSearch;
+    }
+    if (options?.descriptionSchema !== undefined) {
+      body.description_schema = options.descriptionSchema;
     }
     return this.request('PUT', `${this.paths.apiFoldersRoot(aKey)}/${fKey}/`, {
       jsonBody: body,
@@ -475,11 +507,10 @@ export class ManagementClient {
 
   async deleteFluxRolePermission(roleKey: FluxRoleRef, contentType: string): Promise<void> {
     const key = resolveKey(roleKey);
-    await this.request(
-      'DELETE',
-      `${this.paths.fluxRolePermissionsRoot(key)}/`,
-      { params: { content_type: contentType }, parseJson: false },
-    );
+    await this.request('DELETE', `${this.paths.fluxRolePermissionsRoot(key)}/`, {
+      params: { content_type: contentType },
+      parseJson: false,
+    });
   }
 
   async replaceFluxRolePermissions(
@@ -549,10 +580,7 @@ export class ManagementClient {
     });
   }
 
-  async listFolderTree(options?: {
-    key?: string;
-    mode?: string;
-  }): Promise<FolderList> {
+  async listFolderTree(options?: { key?: string; mode?: string }): Promise<FolderList> {
     const params: Record<string, any> = {};
     if (options?.key) params.key = options.key;
     if (options?.mode) params.mode = options.mode;
@@ -563,10 +591,7 @@ export class ManagementClient {
     return this.request('POST', `${this.paths.foldersTreeRoot()}/`, { jsonBody: payload });
   }
 
-  async updateFolder(
-    folderKey: FolderRef,
-    payload: Record<string, any>,
-  ): Promise<FolderSummary> {
+  async updateFolder(folderKey: FolderRef, payload: Record<string, any>): Promise<FolderSummary> {
     const key = resolveKey(folderKey);
     return this.request('PUT', `${this.paths.foldersTreeItem()}/`, {
       params: { key },
@@ -638,10 +663,7 @@ export class ManagementClient {
     });
   }
 
-  async deleteFolderVersion(
-    folderKey: FolderRef,
-    versionKey: SchemaVersionRef,
-  ): Promise<void> {
+  async deleteFolderVersion(folderKey: FolderRef, versionKey: SchemaVersionRef): Promise<void> {
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
     await this.request('DELETE', `${this.paths.folderVersionsBase(fKey)}/${vKey}/`, {
@@ -655,10 +677,7 @@ export class ManagementClient {
   ): Promise<SchemaVersionSummary> {
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
-    return this.request(
-      'POST',
-      `${this.paths.folderVersionsBase(fKey)}/${vKey}/publish/`,
-    );
+    return this.request('POST', `${this.paths.folderVersionsBase(fKey)}/${vKey}/publish/`);
   }
 
   // ------------------------------------------------------------------ //
@@ -694,11 +713,9 @@ export class ManagementClient {
   ): Promise<FieldSummary> {
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
-    return this.request(
-      'GET',
-      `${this.paths.folderSchemaTree(fKey, vKey)}/field/`,
-      { params: { path: fieldPath } },
-    );
+    return this.request('GET', `${this.paths.folderSchemaTree(fKey, vKey)}/field/`, {
+      params: { path: fieldPath },
+    });
   }
 
   async updateFolderField(
@@ -709,11 +726,10 @@ export class ManagementClient {
   ): Promise<FieldSummary> {
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
-    return this.request(
-      'PUT',
-      `${this.paths.folderSchemaTree(fKey, vKey)}/field/`,
-      { params: { path: fieldPath }, jsonBody: payload },
-    );
+    return this.request('PUT', `${this.paths.folderSchemaTree(fKey, vKey)}/field/`, {
+      params: { path: fieldPath },
+      jsonBody: payload,
+    });
   }
 
   async deleteFolderField(
@@ -723,11 +739,10 @@ export class ManagementClient {
   ): Promise<void> {
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
-    await this.request(
-      'DELETE',
-      `${this.paths.folderSchemaTree(fKey, vKey)}/field/`,
-      { params: { path: fieldPath }, parseJson: false },
-    );
+    await this.request('DELETE', `${this.paths.folderSchemaTree(fKey, vKey)}/field/`, {
+      params: { path: fieldPath },
+      parseJson: false,
+    });
   }
 
   // ------------------------------------------------------------------ //
@@ -810,10 +825,7 @@ export class ManagementClient {
   ): Promise<SchemaVersionSummary> {
     const cKey = resolveKey(componentKey);
     const vKey = resolveKey(versionKey);
-    return this.request(
-      'POST',
-      `${this.paths.componentVersionsBase(cKey)}/${vKey}/publish/`,
-    );
+    return this.request('POST', `${this.paths.componentVersionsBase(cKey)}/${vKey}/publish/`);
   }
 
   async updateComponentVersion(
@@ -872,11 +884,9 @@ export class ManagementClient {
   ): Promise<FieldSummary> {
     const cKey = resolveKey(componentKey);
     const vKey = resolveKey(versionKey);
-    return this.request(
-      'GET',
-      `${this.paths.componentSchemaTree(cKey, vKey)}/field/`,
-      { params: { path: fieldPath } },
-    );
+    return this.request('GET', `${this.paths.componentSchemaTree(cKey, vKey)}/field/`, {
+      params: { path: fieldPath },
+    });
   }
 
   async updateComponentField(
@@ -887,11 +897,10 @@ export class ManagementClient {
   ): Promise<FieldSummary> {
     const cKey = resolveKey(componentKey);
     const vKey = resolveKey(versionKey);
-    return this.request(
-      'PUT',
-      `${this.paths.componentSchemaTree(cKey, vKey)}/field/`,
-      { params: { path: fieldPath }, jsonBody: payload },
-    );
+    return this.request('PUT', `${this.paths.componentSchemaTree(cKey, vKey)}/field/`, {
+      params: { path: fieldPath },
+      jsonBody: payload,
+    });
   }
 
   async deleteComponentField(
@@ -901,21 +910,17 @@ export class ManagementClient {
   ): Promise<void> {
     const cKey = resolveKey(componentKey);
     const vKey = resolveKey(versionKey);
-    await this.request(
-      'DELETE',
-      `${this.paths.componentSchemaTree(cKey, vKey)}/field/`,
-      { params: { path: fieldPath }, parseJson: false },
-    );
+    await this.request('DELETE', `${this.paths.componentSchemaTree(cKey, vKey)}/field/`, {
+      params: { path: fieldPath },
+      parseJson: false,
+    });
   }
 
   // ------------------------------------------------------------------ //
   // Resource operations
   // ------------------------------------------------------------------ //
 
-  async listResources(
-    folderKey: FolderRef,
-    params?: Record<string, any>,
-  ): Promise<ResourceList> {
+  async listResources(folderKey: FolderRef, params?: Record<string, any>): Promise<ResourceList> {
     const key = resolveKey(folderKey);
     return this.request('GET', `${this.paths.resourceBase(key)}/`, { params });
   }
@@ -1149,10 +1154,7 @@ export class ManagementClient {
     const fKey = resolveKey(folderKey);
     const rKey = resolveKey(resourceKey);
     const rvKey = resolveKey(revisionKey);
-    return this.request(
-      'POST',
-      `${this.paths.revisionBase(fKey, rKey)}/${rvKey}/validate/`,
-    );
+    return this.request('POST', `${this.paths.revisionBase(fKey, rKey)}/${rvKey}/validate/`);
   }
 
   async getRevisionData(
@@ -1235,10 +1237,7 @@ export class ManagementClient {
   // Environment operations
   // ------------------------------------------------------------------ //
 
-  async listEnvironments(
-    orgKey: OrgRef,
-    projectKey: ProjectRef,
-  ): Promise<EnvironmentList> {
+  async listEnvironments(orgKey: OrgRef, projectKey: ProjectRef): Promise<EnvironmentList> {
     const oKey = resolveKey(orgKey);
     const pKey = resolveKey(projectKey);
     const payload =
@@ -1311,11 +1310,9 @@ export class ManagementClient {
     const oKey = resolveKey(orgKey);
     const pKey = resolveKey(projectKey);
     const eKey = resolveKey(envKey);
-    await this.request(
-      'POST',
-      `${this.paths.environmentRoot(oKey, pKey, eKey)}/toggle/`,
-      { jsonBody: { is_enabled: isEnabled } },
-    );
+    await this.request('POST', `${this.paths.environmentRoot(oKey, pKey, eKey)}/toggle/`, {
+      jsonBody: { is_enabled: isEnabled },
+    });
   }
 
   async updateEnvironmentProtection(
@@ -1331,11 +1328,9 @@ export class ManagementClient {
     if (options.protectionReason) {
       body.protection_reason = options.protectionReason;
     }
-    return this.request(
-      'PATCH',
-      `${this.paths.environmentRoot(oKey, pKey, eKey)}/protection/`,
-      { jsonBody: body },
-    );
+    return this.request('PATCH', `${this.paths.environmentRoot(oKey, pKey, eKey)}/protection/`, {
+      jsonBody: body,
+    });
   }
 
   async clearEnvironmentProtection(
