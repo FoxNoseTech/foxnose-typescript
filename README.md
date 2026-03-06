@@ -177,9 +177,9 @@ try {
   await client.getResource('folder', 'nonexistent-key');
 } catch (err) {
   if (err instanceof FoxnoseAPIError) {
-    console.error(err.statusCode);  // 404
-    console.error(err.errorCode);   // "not_found"
-    console.error(err.detail);      // Additional error details
+    console.error(err.statusCode); // 404
+    console.error(err.errorCode); // "not_found"
+    console.error(err.detail); // Additional error details
   } else if (err instanceof FoxnoseTransportError) {
     console.error('Network error:', err.message);
   }
@@ -204,7 +204,7 @@ const result = await client.batchUpsertResources('folder-key', items, {
 });
 
 console.log(result.succeeded.length); // Successfully upserted
-console.log(result.failed.length);    // Failed items with errors
+console.log(result.failed.length); // Failed items with errors
 ```
 
 ## Development
