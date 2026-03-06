@@ -360,16 +360,25 @@ describe('ManagementClient', () => {
 
   describe('Management Permission Objects', () => {
     it('listManagementPermissionObjects', async () => {
-      const objs = [{ content_type: 'folder', object_key: 'f1' }];
-      setupMockFetch(objs);
+      const payload = {
+        count: 1,
+        next: null,
+        previous: null,
+        results: [{ content_type: 'folder', object: 'f1' }],
+      };
+      const fetchMock = setupMockFetch(payload);
       const client = createClient();
       const result = await client.listManagementPermissionObjects('role-1', 'folder');
-      expect(result).toEqual(objs);
+      expect(result).toEqual([{ content_type: 'folder', object_key: 'f1' }]);
+      expect(fetchMock.mock.calls[0][0]).toContain(
+        '/permissions/management-api/roles/role-1/permissions/objects/',
+      );
+      expect(fetchMock.mock.calls[0][0]).toContain('content_type=folder');
     });
 
     it('addManagementPermissionObject', async () => {
       const obj = { content_type: 'folder', object_key: 'f1' };
-      setupMockFetch(obj);
+      globalThis.fetch = vi.fn(async () => new Response(null, { status: 201 }));
       const client = createClient();
       const result = await client.addManagementPermissionObject('role-1', obj);
       expect(result).toEqual(obj);
@@ -445,15 +454,26 @@ describe('ManagementClient', () => {
 
   describe('Flux Permission Objects', () => {
     it('listFluxPermissionObjects', async () => {
-      const objs = [{ content_type: 'folder', object_key: 'f1' }];
-      setupMockFetch(objs);
+      const payload = {
+        count: 1,
+        next: null,
+        previous: null,
+        results: [{ content_type: 'flux-apis', object: 'api-1' }],
+      };
+      const fetchMock = setupMockFetch(payload);
       const client = createClient();
-      expect(await client.listFluxPermissionObjects('fr-1', 'folder')).toEqual(objs);
+      expect(await client.listFluxPermissionObjects('fr-1', 'flux-apis')).toEqual([
+        { content_type: 'flux-apis', object_key: 'api-1' },
+      ]);
+      expect(fetchMock.mock.calls[0][0]).toContain(
+        '/permissions/flux-api/roles/fr-1/permissions/objects/',
+      );
+      expect(fetchMock.mock.calls[0][0]).toContain('content_type=flux-apis');
     });
 
     it('addFluxPermissionObject', async () => {
       const obj = { content_type: 'folder', object_key: 'f1' };
-      setupMockFetch(obj);
+      globalThis.fetch = vi.fn(async () => new Response(null, { status: 201 }));
       const client = createClient();
       expect(await client.addFluxPermissionObject('fr-1', obj)).toEqual(obj);
     });

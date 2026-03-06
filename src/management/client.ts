@@ -129,6 +129,45 @@ export class ManagementClient {
     this.transport.close();
   }
 
+  private normalizeListPayload<T>(payload: unknown): T[] {
+    if (Array.isArray(payload)) {
+      return payload as T[];
+    }
+    if (payload && typeof payload === 'object') {
+      const results = (payload as { results?: unknown }).results;
+      if (Array.isArray(results)) {
+        return results as T[];
+      }
+      return [payload as T];
+    }
+    return [];
+  }
+
+  private normalizePermissionObjectPayload(
+    payload: unknown,
+    requestPayload: Record<string, any>,
+  ): RolePermissionObject {
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+      const data = { ...(payload as Record<string, any>) };
+      if (!('object_key' in data) && 'object' in data) {
+        data.object_key = data.object;
+        delete data.object;
+      }
+      return data as RolePermissionObject;
+    }
+
+    return {
+      content_type: requestPayload.content_type,
+      object_key: requestPayload.object_key ?? requestPayload.object,
+    };
+  }
+
+  private normalizePermissionObjectListPayload(payload: unknown): RolePermissionObject[] {
+    return this.normalizeListPayload<Record<string, any>>(payload).map((item) =>
+      this.normalizePermissionObjectPayload(item, item),
+    );
+  }
+
   // ------------------------------------------------------------------ //
   // Organization operations
   // ------------------------------------------------------------------ //
@@ -428,11 +467,10 @@ export class ManagementClient {
     contentType: string,
   ): Promise<RolePermissionObject[]> {
     const key = resolveKey(roleKey);
-    const payload =
-      (await this.request('GET', `${this.paths.rolePermissionObjectsRoot(key)}/`, {
-        params: { content_type: contentType },
-      })) ?? [];
-    return Array.isArray(payload) ? payload : [payload];
+    const payload = await this.request('GET', `${this.paths.rolePermissionObjectsRoot(key)}/`, {
+      params: { content_type: contentType },
+    });
+    return this.normalizePermissionObjectListPayload(payload);
   }
 
   async addManagementPermissionObject(
@@ -440,9 +478,10 @@ export class ManagementClient {
     payload: Record<string, any>,
   ): Promise<RolePermissionObject> {
     const key = resolveKey(roleKey);
-    return this.request('POST', `${this.paths.rolePermissionObjectsRoot(key)}/`, {
+    const data = await this.request('POST', `${this.paths.rolePermissionObjectsRoot(key)}/`, {
       jsonBody: payload,
     });
+    return this.normalizePermissionObjectPayload(data, payload);
   }
 
   async deleteManagementPermissionObject(
@@ -531,11 +570,10 @@ export class ManagementClient {
     contentType: string,
   ): Promise<RolePermissionObject[]> {
     const key = resolveKey(roleKey);
-    const payload =
-      (await this.request('GET', `${this.paths.fluxRolePermissionObjectsRoot(key)}/`, {
-        params: { content_type: contentType },
-      })) ?? [];
-    return Array.isArray(payload) ? payload : [payload];
+    const payload = await this.request('GET', `${this.paths.fluxRolePermissionObjectsRoot(key)}/`, {
+      params: { content_type: contentType },
+    });
+    return this.normalizePermissionObjectListPayload(payload);
   }
 
   async addFluxPermissionObject(
@@ -543,9 +581,10 @@ export class ManagementClient {
     payload: Record<string, any>,
   ): Promise<RolePermissionObject> {
     const key = resolveKey(roleKey);
-    return this.request('POST', `${this.paths.fluxRolePermissionObjectsRoot(key)}/`, {
+    const data = await this.request('POST', `${this.paths.fluxRolePermissionObjectsRoot(key)}/`, {
       jsonBody: payload,
     });
+    return this.normalizePermissionObjectPayload(data, payload);
   }
 
   async deleteFluxPermissionObject(
