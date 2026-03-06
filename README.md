@@ -3,6 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@foxnose/sdk)](https://www.npmjs.com/package/@foxnose/sdk)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-green)](https://nodejs.org)
+[![codecov](https://codecov.io/gh/FoxNoseTech/foxnose-typescript/branch/main/graph/badge.svg)](https://codecov.io/gh/FoxNoseTech/foxnose-typescript)
 
 Official TypeScript SDK for the [FoxNose](https://foxnose.net/?utm_source=github&utm_medium=repository&utm_campaign=foxnose-typescript) platform — a managed knowledge layer for RAG and AI agents.
 
