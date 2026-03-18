@@ -42,10 +42,9 @@ export class SecureKeyAuth implements AuthStrategy {
     let path: string;
     try {
       const parsed = new URL(request.url);
+      // Query parameters are excluded from the signature payload to match
+      // server-side verification, which signs only the request path.
       path = parsed.pathname || '/';
-      if (parsed.search) {
-        path = `${path}${parsed.search}`;
-      }
     } catch {
       path = request.path || '/';
     }

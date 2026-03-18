@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from 'node:crypto';
+import { createHash, createVerify, generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { SecureKeyAuth } from '../../src/auth/secure.js';
 import type { RequestData } from '../../src/auth/types.js';
@@ -14,7 +14,7 @@ function generateTestKeyPair() {
   const pubKeyB64 = Buffer.from(publicKey as string)
     .toString('base64')
     .substring(0, 16);
-  return { publicKey: pubKeyB64, privateKey: privateKeyB64 };
+  return { publicKey: pubKeyB64, privateKey: privateKeyB64, verifyKey: publicKey as string };
 }
 
 const dummyRequest: RequestData = {
@@ -92,7 +92,7 @@ describe('SecureKeyAuth', () => {
     expect(headers1.Authorization).not.toBe(headers2.Authorization);
   });
 
-  it('includes query string in signed path', () => {
+  it('ignores query string in signed path', () => {
     const keys = generateTestKeyPair();
     const fixedDate = new Date('2024-06-15T12:00:00Z');
     const auth = new SecureKeyAuth(keys.publicKey, keys.privateKey, {
@@ -106,8 +106,21 @@ describe('SecureKeyAuth', () => {
       path: '/v1/test?page=2',
     });
 
-    // Different query string means different signature
-    expect(headers1.Authorization).not.toBe(headers2.Authorization);
+    const signature1 = Buffer.from(headers1.Authorization.split(':', 2)[1], 'base64');
+    const signature2 = Buffer.from(headers2.Authorization.split(':', 2)[1], 'base64');
+    const bodyHash = createHash('sha256').update(dummyRequest.body).digest('hex');
+    const expectedPayload = `/v1/test|${bodyHash}|2024-06-15T12:00:00Z`;
+
+    const verifier1 = createVerify('SHA256');
+    verifier1.update(expectedPayload);
+    verifier1.end();
+
+    const verifier2 = createVerify('SHA256');
+    verifier2.update(expectedPayload);
+    verifier2.end();
+
+    expect(verifier1.verify(keys.verifyKey, signature1)).toBe(true);
+    expect(verifier2.verify(keys.verifyKey, signature2)).toBe(true);
   });
 
   it('throws on empty publicKey', () => {
