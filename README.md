@@ -100,6 +100,64 @@ console.log(schema.searchable_fields);
 client.close();
 ```
 
+### Vector Search
+
+The Flux client provides typed convenience methods for all vector search modes:
+
+```typescript
+import { FluxClient, SearchMode, buildSearchBody } from '@foxnose/sdk';
+
+// Semantic search (auto-generated embeddings)
+const results = await client.vectorSearch('articles', {
+  query: 'machine learning in healthcare',
+  top_k: 10,
+  similarity_threshold: 0.7,
+});
+
+// Custom embedding search
+const results = await client.vectorFieldSearch('articles', {
+  field: 'content_embedding',
+  query_vector: [0.012, -0.034, 0.056 /* ... */],
+  top_k: 20,
+});
+
+// Hybrid text + vector search
+const results = await client.hybridSearch('articles', {
+  query: 'ML applications',
+  find_text: { query: 'machine learning' },
+  vector_weight: 0.7,
+  text_weight: 0.3,
+});
+
+// Boosted search (keywords boosted by vector similarity)
+const results = await client.boostedSearch('articles', {
+  find_text: { query: 'python tutorial' },
+  query: 'beginner programming guide',
+  boost_factor: 1.5,
+});
+
+// Extra parameters (where, sort) are forwarded to the API
+const results = await client.vectorSearch('articles', {
+  query: 'climate change',
+  limit: 5,
+  sort: '-published_at',
+  where: { category: 'science' },
+});
+```
+
+You can also use `buildSearchBody()` for full control with the raw `search()` method:
+
+```typescript
+const body = buildSearchBody({
+  search_mode: SearchMode.HYBRID,
+  find_text: { query: 'python' },
+  vector_search: { query: 'programming tutorials', top_k: 10 },
+  hybrid_config: { vector_weight: 0.6, text_weight: 0.4 },
+  limit: 20,
+});
+const results = await client.search('articles', body);
+```
+
 ### API Folder Route Descriptions
 
 You can configure per-route descriptions when connecting a folder to an API.

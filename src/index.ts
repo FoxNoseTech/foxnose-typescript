@@ -33,7 +33,21 @@ export type {
 
 // Flux Client
 export { FluxClient } from './flux/index.js';
-export type { FluxClientOptions } from './flux/index.js';
+export { SearchMode, buildSearchBody } from './flux/index.js';
+export type {
+  FluxClientOptions,
+  VectorSearchOptions,
+  VectorFieldSearchOptions,
+  HybridSearchOptions,
+  BoostedSearchOptions,
+} from './flux/index.js';
+export type {
+  VectorSearch,
+  VectorFieldSearch,
+  VectorBoostConfig,
+  HybridConfig,
+  SearchRequest,
+} from './flux/index.js';
 
 // Models
 export type {
