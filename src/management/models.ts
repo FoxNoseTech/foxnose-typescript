@@ -65,6 +65,12 @@ export interface FolderSummary {
 
 export type FolderList = PaginatedResponse<FolderSummary>;
 
+// Collection-named aliases — same shape, preferred name in new code.
+/** @public Alias of {@link FolderSummary}. */
+export type CollectionSummary = FolderSummary;
+/** @public Alias of {@link FolderList}. */
+export type CollectionList = FolderList;
+
 // ---------------------------------------------------------------------------
 // Components
 // ---------------------------------------------------------------------------
@@ -280,6 +286,12 @@ export interface APIFolderSummary {
 
 export type APIFolderList = PaginatedResponse<APIFolderSummary>;
 
+// Collection-named aliases.
+/** @public Alias of {@link APIFolderSummary}. */
+export type APICollectionSummary = APIFolderSummary;
+/** @public Alias of {@link APIFolderList}. */
+export type APICollectionList = APIFolderList;
+
 // ---------------------------------------------------------------------------
 // Organizations
 // ---------------------------------------------------------------------------
@@ -414,6 +426,8 @@ export interface BatchUpsertResult {
 // ---------------------------------------------------------------------------
 
 export type FolderRef = string | FolderSummary;
+/** @public Alias of {@link FolderRef} — preferred name in new code. */
+export type CollectionRef = FolderRef;
 export type ResourceRef = string | ResourceSummary;
 export type RevisionRef = string | RevisionSummary;
 export type ComponentRef = string | ComponentSummary;

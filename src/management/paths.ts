@@ -14,13 +14,22 @@ export function managementPaths(environmentKey: string) {
     environmentRoot: (orgKey: string, projectKey: string, envKey: string) =>
       `/organizations/${orgKey}/projects/${projectKey}/environments/${envKey}`,
 
-    // Folder paths
+    // Folder paths (deprecated — see Collection paths below).
     foldersTreeRoot: () => `/v1/${environmentKey}/folders/tree`,
     foldersTreeItem: () => `/v1/${environmentKey}/folders/tree/folder`,
     folderVersionsBase: (folderKey: string) =>
       `/v1/${environmentKey}/folders/${folderKey}/model/versions`,
     folderSchemaTree: (folderKey: string, versionKey: string) =>
       `/v1/${environmentKey}/folders/${folderKey}/model/versions/${versionKey}/schema/tree`,
+
+    // Collection paths (canonical going forward; folder paths above hit the
+    // deprecated /folders/ URL alias on the server side).
+    collectionsTreeRoot: () => `/v1/${environmentKey}/collections/tree`,
+    collectionsTreeItem: () => `/v1/${environmentKey}/collections/tree/collection`,
+    collectionVersionsBase: (collectionKey: string) =>
+      `/v1/${environmentKey}/collections/${collectionKey}/model/versions`,
+    collectionSchemaTree: (collectionKey: string, versionKey: string) =>
+      `/v1/${environmentKey}/collections/${collectionKey}/model/versions/${versionKey}/schema/tree`,
 
     // Component paths
     componentsRoot: () => `/v1/${environmentKey}/components`,
@@ -49,6 +58,8 @@ export function managementPaths(environmentKey: string) {
     apisRoot: () => `/v1/${environmentKey}/api`,
     apiRoot: (apiKey: string) => `/v1/${environmentKey}/api/${apiKey}`,
     apiFoldersRoot: (apiKey: string) => `/v1/${environmentKey}/api/${apiKey}/folders`,
+    apiCollectionsRoot: (apiKey: string) =>
+      `/v1/${environmentKey}/api/${apiKey}/collections`,
 
     // Management role paths
     managementRolesRoot: () => `/v1/${environmentKey}/permissions/management-api/roles`,

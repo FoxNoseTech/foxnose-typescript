@@ -48,12 +48,12 @@ const client = new ManagementClient({
   auth,
 });
 
-// List folders
-const folders = await client.listFolders();
-console.log(folders.results);
+// List collections
+const collections = await client.listCollections();
+console.log(collections.results);
 
 // Create a resource
-const resource = await client.createResource('my-folder-key', {
+const resource = await client.createResource('my-collection-key', {
   data: { title: 'Hello World' },
 });
 console.log(resource.key);
@@ -61,6 +61,13 @@ console.log(resource.key);
 // Clean up
 client.close();
 ```
+
+> **Note (0.4.0):** Folder-named methods (`listFolders`, `createFolder`,
+> `addApiFolder`, `listFolderVersions`, `listFolderFields`, etc.) remain as
+> `@deprecated` aliases that emit a one-shot `console.warn` on first use per
+> process. They keep their original wire behaviour (hitting the legacy
+> `/folders/...` URL alias on the server) and will be removed in **1.0**.
+> Prefer the `*Collection*` names in new code.
 
 ### Flux Client
 
