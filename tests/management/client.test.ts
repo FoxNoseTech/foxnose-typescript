@@ -617,6 +617,96 @@ describe('ManagementClient', () => {
     });
   });
 
+  describe('Collection sync_component', () => {
+    it('syncCollectionComponent — empty body (sync all pinned)', async () => {
+      const response = {
+        synced_paths: ['seo'],
+        skipped: [],
+        schema_version: 'ver-new-12345',
+      };
+      const fetchMock = setupMockFetch(response);
+      const client = createClient();
+      const result = await client.syncCollectionComponent('articles');
+
+      expect(result).toEqual(response);
+      // URL hits the new endpoint
+      expect(fetchMock.mock.calls[0][0]).toContain('/collections/articles/sync_component/');
+      // Empty body when no options supplied
+      const init = fetchMock.mock.calls[0][1] as { body?: string };
+      expect(JSON.parse(init.body ?? '{}')).toEqual({});
+    });
+
+    it('syncCollectionComponent — fieldPaths only', async () => {
+      const response = {
+        synced_paths: ['seo'],
+        skipped: [{ path: 'hero', reason: 'not_requested' }],
+        schema_version: 'ver-new-12345',
+      };
+      const fetchMock = setupMockFetch(response);
+      const client = createClient();
+      await client.syncCollectionComponent('articles', { fieldPaths: ['seo'] });
+
+      const init = fetchMock.mock.calls[0][1] as { body?: string };
+      expect(JSON.parse(init.body ?? '{}')).toEqual({ field_paths: ['seo'] });
+    });
+
+    it('syncCollectionComponent — fieldPaths + toVersions', async () => {
+      const response = {
+        synced_paths: ['seo'],
+        skipped: [],
+        schema_version: 'ver-new-12345',
+      };
+      const fetchMock = setupMockFetch(response);
+      const client = createClient();
+      await client.syncCollectionComponent('articles', {
+        fieldPaths: ['seo'],
+        toVersions: { seo: 'ver-target-abc' },
+      });
+
+      const init = fetchMock.mock.calls[0][1] as { body?: string };
+      expect(JSON.parse(init.body ?? '{}')).toEqual({
+        field_paths: ['seo'],
+        to_versions: { seo: 'ver-target-abc' },
+      });
+    });
+
+    it('syncCollectionComponent — collection ref by summary object', async () => {
+      const response = { synced_paths: [], skipped: [], schema_version: null };
+      const fetchMock = setupMockFetch(response);
+      const client = createClient();
+      await client.syncCollectionComponent({ key: 'articles' } as any);
+      expect(fetchMock.mock.calls[0][0]).toContain('/collections/articles/sync_component/');
+    });
+
+    it('syncCollectionComponent — rejects toVersions keys not in fieldPaths', async () => {
+      // No HTTP call should fire — the preflight check must throw first.
+      const fetchMock = vi.fn(async () => new Response(JSON.stringify({}), { status: 200 }));
+      globalThis.fetch = fetchMock;
+      const client = createClient();
+
+      await expect(
+        client.syncCollectionComponent('articles', {
+          fieldPaths: ['seo'],
+          toVersions: { hero: 'ver-something' },
+        }),
+      ).rejects.toThrow(/hero/);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('syncCollectionComponent — accepts toVersions alone without fieldPaths', async () => {
+      const response = { synced_paths: [], skipped: [], schema_version: null };
+      const fetchMock = setupMockFetch(response);
+      const client = createClient();
+      await client.syncCollectionComponent('articles', {
+        toVersions: { seo: 'ver-target-abc' },
+      });
+      const init = fetchMock.mock.calls[0][1] as { body?: string };
+      expect(JSON.parse(init.body ?? '{}')).toEqual({
+        to_versions: { seo: 'ver-target-abc' },
+      });
+    });
+  });
+
   describe('Folder Fields', () => {
     it('listFolderFields', async () => {
       const data = { count: 2, results: [{ key: 'field1' }] };

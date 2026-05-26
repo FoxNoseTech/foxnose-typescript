@@ -62,6 +62,7 @@ import type {
   SchemaVersionList,
   SchemaVersionRef,
   SchemaVersionSummary,
+  SyncComponentResponse,
 } from './models.js';
 import { resolveKey } from './models.js';
 import { managementPaths } from './paths.js';
@@ -846,6 +847,85 @@ export class ManagementClient {
     return this.request(
       'POST',
       `${this.paths.collectionVersionsBase(cKey)}/${vKey}/publish/`,
+    );
+  }
+
+  /**
+   * Advance pinned nested fields on a Collection to a target Component version.
+   *
+   * Creates a new published Collection schema version with the affected
+   * `meta.component_version` pins advanced. Fields with `auto_update=true`
+   * and fields already at the requested target version are reported in
+   * `skipped` rather than advanced.
+   *
+   * @param collectionKey The Collection to sync.
+   * @param options.fieldPaths Optional list of nested field paths to advance.
+   *   When omitted, every pinned (`auto_update=false`) nested field on the
+   *   Collection's current version is considered.
+   * @param options.toVersions Optional per-path override mapping field path
+   *   to target Component Version UID. Paths not in this mapping advance to
+   *   the referenced Component's `current_version`. When both `fieldPaths`
+   *   and `toVersions` are supplied, every key in `toVersions` must also
+   *   appear in `fieldPaths`.
+   *
+   * @returns Summary of synced and skipped paths, plus the new
+   *   `schema_version` UID (`null` if no paths were advanced).
+   *
+   * @throws `Error` locally (before any HTTP request) when both `fieldPaths`
+   *   and `toVersions` are supplied AND `toVersions` contains a key that is
+   *   not in `fieldPaths` (mirrors the server-side validator so the misuse
+   *   surfaces at the call-site).
+   * @throws `FoxnoseApiError` on:
+   *   - 409 `component_sync_conflict` — target version would break existing resources
+   *   - 422 `too_many_versions` — Collection schema quota exhausted
+   *   - 422 `validation_error` — request body invalid
+   *   - 404 — Collection or specified target version missing
+   *
+   * @example
+   * ```ts
+   * // Advance every pinned nested field to its Component's current version.
+   * await client.syncCollectionComponent('articles');
+   *
+   * // Advance a specific path to a chosen Component version.
+   * await client.syncCollectionComponent('articles', {
+   *   fieldPaths: ['seo'],
+   *   toVersions: { seo: 'ver-def67890' },
+   * });
+   * ```
+   */
+  async syncCollectionComponent(
+    collectionKey: CollectionRef,
+    options: {
+      fieldPaths?: string[];
+      toVersions?: Record<string, string>;
+    } = {},
+  ): Promise<SyncComponentResponse> {
+    const cKey = resolveKey(collectionKey);
+    // Client-side invariant (mirrors the server validator): every key in
+    // toVersions must also appear in fieldPaths when both are supplied.
+    // Catch the misuse locally instead of round-tripping a 422.
+    if (options.fieldPaths !== undefined && options.toVersions !== undefined) {
+      const fieldPathSet = new Set(options.fieldPaths);
+      const extras = Object.keys(options.toVersions)
+        .filter((k) => !fieldPathSet.has(k))
+        .sort();
+      if (extras.length > 0) {
+        throw new Error(
+          `toVersions includes paths not present in fieldPaths: [${extras.join(', ')}]`,
+        );
+      }
+    }
+    const body: Record<string, unknown> = {};
+    if (options.fieldPaths !== undefined) {
+      body.field_paths = options.fieldPaths;
+    }
+    if (options.toVersions !== undefined) {
+      body.to_versions = options.toVersions;
+    }
+    return this.request(
+      'POST',
+      `${this.paths.collectionSyncComponent(cKey)}/`,
+      { jsonBody: body },
     );
   }
 

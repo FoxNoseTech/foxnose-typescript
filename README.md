@@ -69,6 +69,55 @@ client.close();
 > `/folders/...` URL alias on the server) and will be removed in **1.0**.
 > Prefer the `*Collection*` names in new code.
 
+### Components on Collections
+
+Collections can embed Components as nested fields with explicit pin
+semantics (`component`, `component_version`, `auto_update`). The
+`nestedFieldMeta` helper builds the `meta` block with camelCase
+ergonomics, and `syncCollectionComponent` advances pinned fields to a
+target Component version on demand.
+
+```typescript
+import { ManagementClient, JWTAuth, nestedFieldMeta } from '@foxnose/sdk';
+
+const client = new ManagementClient({
+  config: { baseUrl: 'https://api.foxnose.com' },
+  environmentKey: 'prod',
+  auth: new JWTAuth('ACCESS_TOKEN'),
+});
+
+// Embed a Component as a pinned nested field on a Collection draft.
+await client.createCollectionField('articles', 'v2-draft', {
+  key: 'seo',
+  name: 'SEO',
+  type: 'nested',
+  required: true,
+  meta: nestedFieldMeta({
+    component: 'cmp-seo-metadata',
+    componentVersion: 'ver-abc12345',
+    autoUpdate: false, // default — pin until explicit sync
+  }),
+});
+
+// Later, advance every pinned nested field to its Component's
+// current version (empty body = sync all pinned).
+const result = await client.syncCollectionComponent('articles');
+console.log(result.synced_paths, result.schema_version);
+
+// Advance specific paths to a chosen Component version.
+await client.syncCollectionComponent('articles', {
+  fieldPaths: ['seo'],
+  toVersions: { seo: 'ver-def67890' },
+});
+```
+
+`syncCollectionComponent` returns a `SyncComponentResponse` with
+`synced_paths`, `skipped` (per-path reasons), and `schema_version`
+(UID of the newly published Collection schema version, or `null` if no
+field needed advancing). On compatibility conflict the server returns
+409 `component_sync_conflict`; quota exhaustion returns 422
+`too_many_versions`. Both surface as `FoxnoseAPIError`.
+
 ### Flux Client
 
 ```typescript
