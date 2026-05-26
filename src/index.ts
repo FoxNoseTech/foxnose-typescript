@@ -66,6 +66,10 @@ export type {
   SchemaVersionList,
   FieldSummary,
   FieldList,
+  NestedFieldMeta,
+  SyncComponentSkippedItem,
+  SyncComponentResponse,
+  ComponentSyncConflictDetail,
   RegionInfo,
   ProjectSummary,
   ProjectList,
@@ -122,6 +126,6 @@ export type {
   APIRef,
 } from './management/models.js';
 
-export { resolveKey } from './management/models.js';
+export { resolveKey, nestedFieldMeta } from './management/models.js';
 
 export { SDK_VERSION as VERSION } from './config.js';

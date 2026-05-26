@@ -30,6 +30,8 @@ export function managementPaths(environmentKey: string) {
       `/v1/${environmentKey}/collections/${collectionKey}/model/versions`,
     collectionSchemaTree: (collectionKey: string, versionKey: string) =>
       `/v1/${environmentKey}/collections/${collectionKey}/model/versions/${versionKey}/schema/tree`,
+    collectionSyncComponent: (collectionKey: string) =>
+      `/v1/${environmentKey}/collections/${collectionKey}/sync_component`,
 
     // Component paths
     componentsRoot: () => `/v1/${environmentKey}/components`,
