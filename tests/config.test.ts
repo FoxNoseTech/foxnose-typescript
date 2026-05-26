@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createConfig, DEFAULT_RETRY_CONFIG, DEFAULT_USER_AGENT } from '../src/config.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+import { VERSION } from '../src/index.js';
+import { createConfig, DEFAULT_RETRY_CONFIG, DEFAULT_USER_AGENT, SDK_VERSION } from '../src/config.js';
 
 describe('createConfig', () => {
   it('creates config with defaults', () => {
@@ -29,6 +34,18 @@ describe('createConfig', () => {
 
   it('throws on empty baseUrl', () => {
     expect(() => createConfig({ baseUrl: '' })).toThrow('baseUrl must be provided');
+  });
+});
+
+describe('SDK_VERSION', () => {
+  it('matches package.json version (drift check)', () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pkg = JSON.parse(
+      readFileSync(resolve(here, '..', 'package.json'), 'utf8'),
+    );
+    expect(SDK_VERSION).toBe(pkg.version);
+    expect(VERSION).toBe(pkg.version);
+    expect(DEFAULT_USER_AGENT).toBe(`foxnose-sdk-js/${pkg.version}`);
   });
 });
 

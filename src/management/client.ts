@@ -2,7 +2,10 @@ import type { AuthStrategy } from '../auth/types.js';
 import type { RetryConfig } from '../config.js';
 import { createConfig } from '../config.js';
 import { HttpTransport } from '../http.js';
+import { warnDeprecatedMethod } from '../_deprecation.js';
 import type {
+  APICollectionList,
+  APICollectionSummary,
   APIFolderList,
   APIFolderSummary,
   APIInfo,
@@ -11,6 +14,9 @@ import type {
   BatchItemError,
   BatchUpsertItem,
   BatchUpsertResult,
+  CollectionList,
+  CollectionRef,
+  CollectionSummary,
   ComponentList,
   ComponentRef,
   ComponentSummary,
@@ -308,19 +314,114 @@ export class ManagementClient {
   }
 
   // ------------------------------------------------------------------ //
-  // API Folder associations
+  // API ↔ Collection association (canonical)
   // ------------------------------------------------------------------ //
 
+  async listApiCollections(
+    apiKey: APIRef,
+    params?: Record<string, any>,
+  ): Promise<APICollectionList> {
+    const key = resolveKey(apiKey);
+    return this.request('GET', `${this.paths.apiCollectionsRoot(key)}/`, { params });
+  }
+
+  async addApiCollection(
+    apiKey: APIRef,
+    collectionKey: CollectionRef,
+    options?: ApiFolderOptions,
+  ): Promise<APICollectionSummary> {
+    const aKey = resolveKey(apiKey);
+    const cKey = resolveKey(collectionKey);
+    // Wire field name `folder` is preserved for backwards compat.
+    const body: Record<string, any> = { folder: cKey };
+    if (options?.allowedMethods !== undefined) {
+      body.allowed_methods = options.allowedMethods;
+    }
+    if (options?.descriptionGetOne !== undefined) {
+      body.description_get_one = options.descriptionGetOne;
+    }
+    if (options?.descriptionGetMany !== undefined) {
+      body.description_get_many = options.descriptionGetMany;
+    }
+    if (options?.descriptionSearch !== undefined) {
+      body.description_search = options.descriptionSearch;
+    }
+    if (options?.descriptionSchema !== undefined) {
+      body.description_schema = options.descriptionSchema;
+    }
+    return this.request('POST', `${this.paths.apiCollectionsRoot(aKey)}/`, {
+      jsonBody: body,
+    });
+  }
+
+  async getApiCollection(
+    apiKey: APIRef,
+    collectionKey: CollectionRef,
+  ): Promise<APICollectionSummary> {
+    const aKey = resolveKey(apiKey);
+    const cKey = resolveKey(collectionKey);
+    return this.request('GET', `${this.paths.apiCollectionsRoot(aKey)}/${cKey}/`);
+  }
+
+  async updateApiCollection(
+    apiKey: APIRef,
+    collectionKey: CollectionRef,
+    options?: ApiFolderOptions,
+  ): Promise<APICollectionSummary> {
+    const aKey = resolveKey(apiKey);
+    const cKey = resolveKey(collectionKey);
+    const body: Record<string, any> = {};
+    if (options?.allowedMethods !== undefined) {
+      body.allowed_methods = options.allowedMethods;
+    }
+    if (options?.descriptionGetOne !== undefined) {
+      body.description_get_one = options.descriptionGetOne;
+    }
+    if (options?.descriptionGetMany !== undefined) {
+      body.description_get_many = options.descriptionGetMany;
+    }
+    if (options?.descriptionSearch !== undefined) {
+      body.description_search = options.descriptionSearch;
+    }
+    if (options?.descriptionSchema !== undefined) {
+      body.description_schema = options.descriptionSchema;
+    }
+    return this.request('PUT', `${this.paths.apiCollectionsRoot(aKey)}/${cKey}/`, {
+      jsonBody: body,
+    });
+  }
+
+  async removeApiCollection(
+    apiKey: APIRef,
+    collectionKey: CollectionRef,
+  ): Promise<void> {
+    const aKey = resolveKey(apiKey);
+    const cKey = resolveKey(collectionKey);
+    await this.request(
+      'DELETE',
+      `${this.paths.apiCollectionsRoot(aKey)}/${cKey}/`,
+      { parseJson: false },
+    );
+  }
+
+  // ------------------------------------------------------------------ //
+  // API ↔ Folder association (deprecated; hits legacy /folders/ URL)
+  // ------------------------------------------------------------------ //
+
+  /** @deprecated Use {@link listApiCollections} instead. */
   async listApiFolders(apiKey: APIRef, params?: Record<string, any>): Promise<APIFolderList> {
+    warnDeprecatedMethod('listApiFolders', 'listApiCollections');
     const key = resolveKey(apiKey);
     return this.request('GET', `${this.paths.apiFoldersRoot(key)}/`, { params });
   }
 
+  /** @deprecated Use {@link addApiCollection} instead. */
   async addApiFolder(
     apiKey: APIRef,
     folderKey: FolderRef,
     options?: ApiFolderOptions,
   ): Promise<APIFolderSummary> {
+    warnDeprecatedMethod('addApiFolder', 'addApiCollection');
     const aKey = resolveKey(apiKey);
     const fKey = resolveKey(folderKey);
     const body: Record<string, any> = { folder: fKey };
@@ -342,17 +443,21 @@ export class ManagementClient {
     return this.request('POST', `${this.paths.apiFoldersRoot(aKey)}/`, { jsonBody: body });
   }
 
+  /** @deprecated Use {@link getApiCollection} instead. */
   async getApiFolder(apiKey: APIRef, folderKey: FolderRef): Promise<APIFolderSummary> {
+    warnDeprecatedMethod('getApiFolder', 'getApiCollection');
     const aKey = resolveKey(apiKey);
     const fKey = resolveKey(folderKey);
     return this.request('GET', `${this.paths.apiFoldersRoot(aKey)}/${fKey}/`);
   }
 
+  /** @deprecated Use {@link updateApiCollection} instead. */
   async updateApiFolder(
     apiKey: APIRef,
     folderKey: FolderRef,
     options?: ApiFolderOptions,
   ): Promise<APIFolderSummary> {
+    warnDeprecatedMethod('updateApiFolder', 'updateApiCollection');
     const aKey = resolveKey(apiKey);
     const fKey = resolveKey(folderKey);
     const body: Record<string, any> = {};
@@ -376,7 +481,9 @@ export class ManagementClient {
     });
   }
 
+  /** @deprecated Use {@link removeApiCollection} instead. */
   async removeApiFolder(apiKey: APIRef, folderKey: FolderRef): Promise<void> {
+    warnDeprecatedMethod('removeApiFolder', 'removeApiCollection');
     const aKey = resolveKey(apiKey);
     const fKey = resolveKey(folderKey);
     await this.request('DELETE', `${this.paths.apiFoldersRoot(aKey)}/${fKey}/`, {
@@ -599,38 +706,269 @@ export class ManagementClient {
   }
 
   // ------------------------------------------------------------------ //
-  // Folder operations
+  // Collection operations (canonical)
   // ------------------------------------------------------------------ //
 
+  async listCollections(params?: Record<string, any>): Promise<CollectionList> {
+    return this.request('GET', `${this.paths.collectionsTreeRoot()}/`, { params });
+  }
+
+  async getCollection(collectionKey: CollectionRef): Promise<CollectionSummary> {
+    const key = resolveKey(collectionKey);
+    return this.request('GET', `${this.paths.collectionsTreeItem()}/`, {
+      params: { key },
+    });
+  }
+
+  async getCollectionByPath(path: string): Promise<CollectionSummary> {
+    return this.request('GET', `${this.paths.collectionsTreeItem()}/`, {
+      params: { path },
+    });
+  }
+
+  async listCollectionTree(
+    options?: { key?: string; mode?: string },
+  ): Promise<CollectionList> {
+    const params: Record<string, any> = {};
+    if (options?.key) params.key = options.key;
+    if (options?.mode) params.mode = options.mode;
+    return this.request('GET', `${this.paths.collectionsTreeRoot()}/`, { params });
+  }
+
+  async createCollection(payload: Record<string, any>): Promise<CollectionSummary> {
+    return this.request('POST', `${this.paths.collectionsTreeRoot()}/`, {
+      jsonBody: payload,
+    });
+  }
+
+  async updateCollection(
+    collectionKey: CollectionRef,
+    payload: Record<string, any>,
+  ): Promise<CollectionSummary> {
+    const key = resolveKey(collectionKey);
+    return this.request('PUT', `${this.paths.collectionsTreeItem()}/`, {
+      params: { key },
+      jsonBody: payload,
+    });
+  }
+
+  async deleteCollection(collectionKey: CollectionRef): Promise<void> {
+    const key = resolveKey(collectionKey);
+    await this.request('DELETE', `${this.paths.collectionsTreeItem()}/`, {
+      params: { key },
+      parseJson: false,
+    });
+  }
+
+  // ------------------------------------------------------------------ //
+  // Collection schema version operations (canonical)
+  // ------------------------------------------------------------------ //
+
+  async listCollectionVersions(
+    collectionKey: CollectionRef,
+    params?: Record<string, any>,
+  ): Promise<SchemaVersionList> {
+    const key = resolveKey(collectionKey);
+    return this.request('GET', `${this.paths.collectionVersionsBase(key)}/`, {
+      params,
+    });
+  }
+
+  async createCollectionVersion(
+    collectionKey: CollectionRef,
+    payload: Record<string, any>,
+    options?: { copyFrom?: SchemaVersionRef },
+  ): Promise<SchemaVersionSummary> {
+    const key = resolveKey(collectionKey);
+    const params: Record<string, any> = {};
+    if (options?.copyFrom) {
+      params.copy_from = resolveKey(options.copyFrom);
+    }
+    return this.request('POST', `${this.paths.collectionVersionsBase(key)}/`, {
+      jsonBody: payload,
+      params: Object.keys(params).length > 0 ? params : undefined,
+    });
+  }
+
+  async getCollectionVersion(
+    collectionKey: CollectionRef,
+    versionKey: SchemaVersionRef,
+    options?: { includeSchema?: boolean },
+  ): Promise<SchemaVersionSummary> {
+    const cKey = resolveKey(collectionKey);
+    const vKey = resolveKey(versionKey);
+    const params: Record<string, any> = {};
+    if (options?.includeSchema !== undefined) {
+      params.include_schema = options.includeSchema;
+    }
+    return this.request(
+      'GET',
+      `${this.paths.collectionVersionsBase(cKey)}/${vKey}/`,
+      {
+        params: Object.keys(params).length > 0 ? params : undefined,
+      },
+    );
+  }
+
+  async updateCollectionVersion(
+    collectionKey: CollectionRef,
+    versionKey: SchemaVersionRef,
+    payload: Record<string, any>,
+  ): Promise<SchemaVersionSummary> {
+    const cKey = resolveKey(collectionKey);
+    const vKey = resolveKey(versionKey);
+    return this.request(
+      'PUT',
+      `${this.paths.collectionVersionsBase(cKey)}/${vKey}/`,
+      { jsonBody: payload },
+    );
+  }
+
+  async deleteCollectionVersion(
+    collectionKey: CollectionRef,
+    versionKey: SchemaVersionRef,
+  ): Promise<void> {
+    const cKey = resolveKey(collectionKey);
+    const vKey = resolveKey(versionKey);
+    await this.request(
+      'DELETE',
+      `${this.paths.collectionVersionsBase(cKey)}/${vKey}/`,
+      { parseJson: false },
+    );
+  }
+
+  async publishCollectionVersion(
+    collectionKey: CollectionRef,
+    versionKey: SchemaVersionRef,
+  ): Promise<SchemaVersionSummary> {
+    const cKey = resolveKey(collectionKey);
+    const vKey = resolveKey(versionKey);
+    return this.request(
+      'POST',
+      `${this.paths.collectionVersionsBase(cKey)}/${vKey}/publish/`,
+    );
+  }
+
+  // ------------------------------------------------------------------ //
+  // Collection schema field operations (canonical)
+  // ------------------------------------------------------------------ //
+
+  async listCollectionFields(
+    collectionKey: CollectionRef,
+    versionKey: SchemaVersionRef,
+    params?: Record<string, any>,
+  ): Promise<FieldList> {
+    const cKey = resolveKey(collectionKey);
+    const vKey = resolveKey(versionKey);
+    return this.request(
+      'GET',
+      `${this.paths.collectionSchemaTree(cKey, vKey)}/`,
+      { params },
+    );
+  }
+
+  async createCollectionField(
+    collectionKey: CollectionRef,
+    versionKey: SchemaVersionRef,
+    payload: Record<string, any>,
+  ): Promise<FieldSummary> {
+    const cKey = resolveKey(collectionKey);
+    const vKey = resolveKey(versionKey);
+    return this.request(
+      'POST',
+      `${this.paths.collectionSchemaTree(cKey, vKey)}/`,
+      { jsonBody: payload },
+    );
+  }
+
+  async getCollectionField(
+    collectionKey: CollectionRef,
+    versionKey: SchemaVersionRef,
+    fieldPath: string,
+  ): Promise<FieldSummary> {
+    const cKey = resolveKey(collectionKey);
+    const vKey = resolveKey(versionKey);
+    return this.request(
+      'GET',
+      `${this.paths.collectionSchemaTree(cKey, vKey)}/field/`,
+      { params: { path: fieldPath } },
+    );
+  }
+
+  async updateCollectionField(
+    collectionKey: CollectionRef,
+    versionKey: SchemaVersionRef,
+    fieldPath: string,
+    payload: Record<string, any>,
+  ): Promise<FieldSummary> {
+    const cKey = resolveKey(collectionKey);
+    const vKey = resolveKey(versionKey);
+    return this.request(
+      'PUT',
+      `${this.paths.collectionSchemaTree(cKey, vKey)}/field/`,
+      { params: { path: fieldPath }, jsonBody: payload },
+    );
+  }
+
+  async deleteCollectionField(
+    collectionKey: CollectionRef,
+    versionKey: SchemaVersionRef,
+    fieldPath: string,
+  ): Promise<void> {
+    const cKey = resolveKey(collectionKey);
+    const vKey = resolveKey(versionKey);
+    await this.request(
+      'DELETE',
+      `${this.paths.collectionSchemaTree(cKey, vKey)}/field/`,
+      { params: { path: fieldPath }, parseJson: false },
+    );
+  }
+
+  // ------------------------------------------------------------------ //
+  // Folder operations (deprecated; hit legacy /folders/ URL)
+  // ------------------------------------------------------------------ //
+
+  /** @deprecated Use {@link listCollections} instead. */
   async listFolders(params?: Record<string, any>): Promise<FolderList> {
+    warnDeprecatedMethod('listFolders', 'listCollections');
     return this.request('GET', `${this.paths.foldersTreeRoot()}/`, { params });
   }
 
+  /** @deprecated Use {@link getCollection} instead. */
   async getFolder(folderKey: FolderRef): Promise<FolderSummary> {
+    warnDeprecatedMethod('getFolder', 'getCollection');
     const key = resolveKey(folderKey);
     return this.request('GET', `${this.paths.foldersTreeItem()}/`, {
       params: { key },
     });
   }
 
+  /** @deprecated Use {@link getCollectionByPath} instead. */
   async getFolderByPath(path: string): Promise<FolderSummary> {
+    warnDeprecatedMethod('getFolderByPath', 'getCollectionByPath');
     return this.request('GET', `${this.paths.foldersTreeItem()}/`, {
       params: { path },
     });
   }
 
+  /** @deprecated Use {@link listCollectionTree} instead. */
   async listFolderTree(options?: { key?: string; mode?: string }): Promise<FolderList> {
+    warnDeprecatedMethod('listFolderTree', 'listCollectionTree');
     const params: Record<string, any> = {};
     if (options?.key) params.key = options.key;
     if (options?.mode) params.mode = options.mode;
     return this.request('GET', `${this.paths.foldersTreeRoot()}/`, { params });
   }
 
+  /** @deprecated Use {@link createCollection} instead. */
   async createFolder(payload: Record<string, any>): Promise<FolderSummary> {
+    warnDeprecatedMethod('createFolder', 'createCollection');
     return this.request('POST', `${this.paths.foldersTreeRoot()}/`, { jsonBody: payload });
   }
 
+  /** @deprecated Use {@link updateCollection} instead. */
   async updateFolder(folderKey: FolderRef, payload: Record<string, any>): Promise<FolderSummary> {
+    warnDeprecatedMethod('updateFolder', 'updateCollection');
     const key = resolveKey(folderKey);
     return this.request('PUT', `${this.paths.foldersTreeItem()}/`, {
       params: { key },
@@ -638,7 +976,9 @@ export class ManagementClient {
     });
   }
 
+  /** @deprecated Use {@link deleteCollection} instead. */
   async deleteFolder(folderKey: FolderRef): Promise<void> {
+    warnDeprecatedMethod('deleteFolder', 'deleteCollection');
     const key = resolveKey(folderKey);
     await this.request('DELETE', `${this.paths.foldersTreeItem()}/`, {
       params: { key },
@@ -647,22 +987,26 @@ export class ManagementClient {
   }
 
   // ------------------------------------------------------------------ //
-  // Folder version operations
+  // Folder version operations (deprecated)
   // ------------------------------------------------------------------ //
 
+  /** @deprecated Use {@link listCollectionVersions} instead. */
   async listFolderVersions(
     folderKey: FolderRef,
     params?: Record<string, any>,
   ): Promise<SchemaVersionList> {
+    warnDeprecatedMethod('listFolderVersions', 'listCollectionVersions');
     const key = resolveKey(folderKey);
     return this.request('GET', `${this.paths.folderVersionsBase(key)}/`, { params });
   }
 
+  /** @deprecated Use {@link createCollectionVersion} instead. */
   async createFolderVersion(
     folderKey: FolderRef,
     payload: Record<string, any>,
     options?: { copyFrom?: SchemaVersionRef },
   ): Promise<SchemaVersionSummary> {
+    warnDeprecatedMethod('createFolderVersion', 'createCollectionVersion');
     const key = resolveKey(folderKey);
     const params: Record<string, any> = {};
     if (options?.copyFrom) {
@@ -674,11 +1018,13 @@ export class ManagementClient {
     });
   }
 
+  /** @deprecated Use {@link getCollectionVersion} instead. */
   async getFolderVersion(
     folderKey: FolderRef,
     versionKey: SchemaVersionRef,
     options?: { includeSchema?: boolean },
   ): Promise<SchemaVersionSummary> {
+    warnDeprecatedMethod('getFolderVersion', 'getCollectionVersion');
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
     const params: Record<string, any> = {};
@@ -690,11 +1036,13 @@ export class ManagementClient {
     });
   }
 
+  /** @deprecated Use {@link updateCollectionVersion} instead. */
   async updateFolderVersion(
     folderKey: FolderRef,
     versionKey: SchemaVersionRef,
     payload: Record<string, any>,
   ): Promise<SchemaVersionSummary> {
+    warnDeprecatedMethod('updateFolderVersion', 'updateCollectionVersion');
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
     return this.request('PUT', `${this.paths.folderVersionsBase(fKey)}/${vKey}/`, {
@@ -702,7 +1050,9 @@ export class ManagementClient {
     });
   }
 
+  /** @deprecated Use {@link deleteCollectionVersion} instead. */
   async deleteFolderVersion(folderKey: FolderRef, versionKey: SchemaVersionRef): Promise<void> {
+    warnDeprecatedMethod('deleteFolderVersion', 'deleteCollectionVersion');
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
     await this.request('DELETE', `${this.paths.folderVersionsBase(fKey)}/${vKey}/`, {
@@ -710,34 +1060,40 @@ export class ManagementClient {
     });
   }
 
+  /** @deprecated Use {@link publishCollectionVersion} instead. */
   async publishFolderVersion(
     folderKey: FolderRef,
     versionKey: SchemaVersionRef,
   ): Promise<SchemaVersionSummary> {
+    warnDeprecatedMethod('publishFolderVersion', 'publishCollectionVersion');
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
     return this.request('POST', `${this.paths.folderVersionsBase(fKey)}/${vKey}/publish/`);
   }
 
   // ------------------------------------------------------------------ //
-  // Folder field operations
+  // Folder field operations (deprecated)
   // ------------------------------------------------------------------ //
 
+  /** @deprecated Use {@link listCollectionFields} instead. */
   async listFolderFields(
     folderKey: FolderRef,
     versionKey: SchemaVersionRef,
     params?: Record<string, any>,
   ): Promise<FieldList> {
+    warnDeprecatedMethod('listFolderFields', 'listCollectionFields');
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
     return this.request('GET', `${this.paths.folderSchemaTree(fKey, vKey)}/`, { params });
   }
 
+  /** @deprecated Use {@link createCollectionField} instead. */
   async createFolderField(
     folderKey: FolderRef,
     versionKey: SchemaVersionRef,
     payload: Record<string, any>,
   ): Promise<FieldSummary> {
+    warnDeprecatedMethod('createFolderField', 'createCollectionField');
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
     return this.request('POST', `${this.paths.folderSchemaTree(fKey, vKey)}/`, {
@@ -745,11 +1101,13 @@ export class ManagementClient {
     });
   }
 
+  /** @deprecated Use {@link getCollectionField} instead. */
   async getFolderField(
     folderKey: FolderRef,
     versionKey: SchemaVersionRef,
     fieldPath: string,
   ): Promise<FieldSummary> {
+    warnDeprecatedMethod('getFolderField', 'getCollectionField');
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
     return this.request('GET', `${this.paths.folderSchemaTree(fKey, vKey)}/field/`, {
@@ -757,12 +1115,14 @@ export class ManagementClient {
     });
   }
 
+  /** @deprecated Use {@link updateCollectionField} instead. */
   async updateFolderField(
     folderKey: FolderRef,
     versionKey: SchemaVersionRef,
     fieldPath: string,
     payload: Record<string, any>,
   ): Promise<FieldSummary> {
+    warnDeprecatedMethod('updateFolderField', 'updateCollectionField');
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
     return this.request('PUT', `${this.paths.folderSchemaTree(fKey, vKey)}/field/`, {
@@ -771,11 +1131,13 @@ export class ManagementClient {
     });
   }
 
+  /** @deprecated Use {@link deleteCollectionField} instead. */
   async deleteFolderField(
     folderKey: FolderRef,
     versionKey: SchemaVersionRef,
     fieldPath: string,
   ): Promise<void> {
+    warnDeprecatedMethod('deleteFolderField', 'deleteCollectionField');
     const fKey = resolveKey(folderKey);
     const vKey = resolveKey(versionKey);
     await this.request('DELETE', `${this.paths.folderSchemaTree(fKey, vKey)}/field/`, {
