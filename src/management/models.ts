@@ -20,7 +20,6 @@ export interface ResourceSummary {
   created_at: string;
   vectors_size: number;
   name?: string | null;
-  component?: string | null;
   resource_owner?: string | null;
   current_revision?: string | null;
   external_id?: string | null;
@@ -50,7 +49,6 @@ export interface FolderSummary {
   key: string;
   name: string;
   alias: string;
-  folder_type: string;
   content_type: string;
   strict_reference: boolean;
   created_at: string;
@@ -531,7 +529,6 @@ export interface OrganizationUsage {
 export interface BatchUpsertItem {
   external_id: string;
   payload: Record<string, any>;
-  component?: string | null;
 }
 
 export interface BatchItemError {

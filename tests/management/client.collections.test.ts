@@ -96,14 +96,14 @@ describe('ManagementClient — Collection methods', () => {
     await client.createCollection({
       name: 'Articles',
       alias: 'articles',
-      folder_type: 'collection',
       content_type: 'document',
     });
     expect(fetchMock.mock.calls[0][0]).toContain('/v1/env-123/collections/tree/');
     expect(fetchMock.mock.calls[0][1]?.method).toBe('POST');
     const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
-    // Wire field name folder_type is preserved.
-    expect(body.folder_type).toBe('collection');
+    expect(body.name).toBe('Articles');
+    expect(body.alias).toBe('articles');
+    expect(body.content_type).toBe('document');
   });
 
   it('updateCollection PUTs to tree/collection/?key', async () => {
@@ -190,7 +190,6 @@ describe('ManagementClient — Collection methods', () => {
       key: 'c1',
       name: 'Articles',
       alias: 'articles',
-      folder_type: 'collection',
       content_type: 'document',
       strict_reference: false,
       created_at: '2026-01-01T00:00:00Z',

@@ -852,15 +852,11 @@ describe('ManagementClient', () => {
         'f1',
         { data: {} },
         {
-          component: 'comp-1',
           externalId: 'ext-1',
         },
       );
-      const url = fetchMock.mock.calls[0][0] as string;
-      expect(url).toContain('component=comp-1');
       const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
       expect(body.external_id).toBe('ext-1');
-      expect(body.component).toBeUndefined();
     });
 
     it('createResource without options', async () => {
@@ -880,24 +876,6 @@ describe('ManagementClient', () => {
       expect(url).toContain('external_id=ext-1');
       const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
       expect(body.external_id).toBeUndefined();
-    });
-
-    it('upsertResource with component', async () => {
-      const resource = { key: 'r1' };
-      const fetchMock = setupMockFetch(resource);
-      const client = createClient();
-      await client.upsertResource(
-        'f1',
-        { data: {} },
-        {
-          externalId: 'ext-1',
-          component: 'comp-1',
-        },
-      );
-      const url = fetchMock.mock.calls[0][0] as string;
-      expect(url).toContain('component=comp-1');
-      const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
-      expect(body.component).toBeUndefined();
     });
 
     it('updateResource', async () => {
@@ -993,13 +971,47 @@ describe('ManagementClient', () => {
       ).rejects.toThrow();
     });
 
-    it('batchUpsertResources with component in items', async () => {
-      const fetchMock = setupMockFetch({ key: 'r1' });
+  });
+
+  describe('Legacy component-option guards', () => {
+    it('createResource throws on legacy component option', async () => {
+      setupMockFetch({ key: 'r-new' });
       const client = createClient();
-      const items = [{ external_id: 'ext-1', payload: { title: 'A' }, component: 'comp-1' }];
-      await client.batchUpsertResources('f1', items);
-      const url = fetchMock.mock.calls[0][0] as string;
-      expect(url).toContain('component=comp-1');
+      await expect(
+        client.createResource('f1', { data: {} }, {
+          externalId: 'ext-1',
+          component: 'cmp-xyz',
+        } as any),
+      ).rejects.toThrow(TypeError);
+    });
+
+    it('upsertResource throws on legacy component option', async () => {
+      setupMockFetch({ key: 'r1' });
+      const client = createClient();
+      await expect(
+        client.upsertResource('f1', { data: {} }, {
+          externalId: 'ext-1',
+          component: 'cmp-xyz',
+        } as any),
+      ).rejects.toThrow(TypeError);
+    });
+
+    it('batchUpsertResources throws when any item carries legacy component', async () => {
+      setupMockFetch({ key: 'r1' });
+      const client = createClient();
+      const items = [
+        { external_id: 'ext-1', payload: { title: 'A' } },
+        { external_id: 'ext-2', payload: { title: 'B' }, component: 'cmp-xyz' } as any,
+      ];
+      await expect(client.batchUpsertResources('f1', items)).rejects.toThrow(TypeError);
+    });
+
+    it('createResource still accepts options without component', async () => {
+      setupMockFetch({ key: 'r-new' });
+      const client = createClient();
+      await expect(
+        client.createResource('f1', { data: {} }, { externalId: 'ext-1' }),
+      ).resolves.toEqual({ key: 'r-new' });
     });
   });
 

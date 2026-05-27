@@ -1415,19 +1415,24 @@ export class ManagementClient {
   async createResource(
     folderKey: FolderRef,
     payload: Record<string, any>,
-    options?: { component?: ComponentRef; externalId?: string },
+    options?: { externalId?: string },
   ): Promise<ResourceSummary> {
-    const key = resolveKey(folderKey);
-    const params: Record<string, string> = {};
-    if (options?.component) {
-      params.component = resolveKey(options.component);
+    // Defensive runtime check: TypeScript callers are protected by the interface
+    // but JS callers (or TS callers using `as any`) can still pass `component`.
+    // Fail loudly so the migration is obvious.
+    if (options && typeof options === 'object' && 'component' in options) {
+      throw new TypeError(
+        'The `component` option has been removed. Resources now derive their ' +
+          "schema from the folder's model. Remove the `component` field from " +
+          'your call site.',
+      );
     }
+    const key = resolveKey(folderKey);
     const body = { ...payload };
     if (options?.externalId) {
       body.external_id = options.externalId;
     }
     return this.request('POST', `${this.paths.resourceBase(key)}/`, {
-      params: Object.keys(params).length ? params : undefined,
       jsonBody: body,
     });
   }
@@ -1435,13 +1440,20 @@ export class ManagementClient {
   async upsertResource(
     folderKey: FolderRef,
     payload: Record<string, any>,
-    options: { externalId: string; component?: ComponentRef },
+    options: { externalId: string },
   ): Promise<ResourceSummary> {
+    // Defensive runtime check: TypeScript callers are protected by the interface
+    // but JS callers (or TS callers using `as any`) can still pass `component`.
+    // Fail loudly so the migration is obvious.
+    if (options && typeof options === 'object' && 'component' in options) {
+      throw new TypeError(
+        'The `component` option has been removed. Resources now derive their ' +
+          "schema from the folder's model. Remove the `component` field from " +
+          'your call site.',
+      );
+    }
     const key = resolveKey(folderKey);
     const params: Record<string, string> = { external_id: options.externalId };
-    if (options.component) {
-      params.component = resolveKey(options.component);
-    }
     return this.request('PUT', `${this.paths.resourceBase(key)}/`, {
       params,
       jsonBody: payload,
@@ -1457,6 +1469,18 @@ export class ManagementClient {
       onProgress?: (completed: number, total: number) => void;
     },
   ): Promise<BatchUpsertResult> {
+    // Defensive runtime check: TypeScript callers are protected by the interface
+    // but JS callers (or TS callers using `as any`) can still pass `component`
+    // on individual items. Fail loudly so the migration is obvious.
+    for (const item of items) {
+      if (item && typeof item === 'object' && 'component' in item) {
+        throw new TypeError(
+          'BatchUpsertItem.component has been removed. Resources now derive ' +
+            "their schema from the folder's model. Remove the `component` " +
+            'field from your batch items.',
+        );
+      }
+    }
     const fKey = resolveKey(folderKey);
     const maxConcurrency = options?.maxConcurrency ?? 5;
     if (maxConcurrency < 1) {
@@ -1477,9 +1501,6 @@ export class ManagementClient {
     const processItem = async (index: number, item: BatchUpsertItem): Promise<void> => {
       try {
         const params: Record<string, string> = { external_id: item.external_id };
-        if (item.component) {
-          params.component = item.component;
-        }
         const result: ResourceSummary = await this.request(
           'PUT',
           `${this.paths.resourceBase(fKey)}/`,
