@@ -18,6 +18,10 @@ export {
   FoxnoseAPIError,
   FoxnoseAuthError,
   FoxnoseTransportError,
+  SpendCapExceededError,
+  PlanExhaustedError,
+  PlanLimitExceededError,
+  RateLimitExceededError,
 } from './errors.js';
 
 // HTTP Transport
