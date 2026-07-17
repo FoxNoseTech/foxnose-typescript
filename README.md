@@ -289,7 +289,7 @@ All API errors are thrown as typed exceptions:
 import { FoxnoseAPIError, FoxnoseTransportError } from '@foxnose/sdk';
 
 try {
-  await client.getResource('folder', 'nonexistent-key');
+  await client.getResource('collection', 'nonexistent-key');
 } catch (err) {
   if (err instanceof FoxnoseAPIError) {
     console.error(err.statusCode); // 404
@@ -297,6 +297,48 @@ try {
     console.error(err.detail); // Additional error details
   } else if (err instanceof FoxnoseTransportError) {
     console.error('Network error:', err.message);
+  }
+}
+```
+
+### Billing errors
+
+Billing-related responses are thrown as typed subclasses of `FoxnoseAPIError`,
+so an existing `catch (err) { if (err instanceof FoxnoseAPIError) ... }` keeps
+working. Narrow to a subclass to read its typed fields:
+
+```typescript
+import {
+  FoxnoseAPIError,
+  SpendCapExceededError,
+  PlanExhaustedError,
+  PlanLimitExceededError,
+  RateLimitExceededError,
+} from '@foxnose/sdk';
+
+try {
+  await client.createResource('collection', payload);
+} catch (err) {
+  if (err instanceof SpendCapExceededError) {
+    // HTTP 402
+    console.error(err.capUsd); // Spend cap in USD (or null)
+    console.error(err.cycleResetsAt); // ISO timestamp
+    console.error(err.raiseCapUrl); // Where to raise the cap
+  } else if (err instanceof PlanExhaustedError) {
+    // HTTP 402
+    console.error(err.axis); // e.g. "retrievals", "writes"
+    console.error(err.windowResetsAt); // ISO timestamp
+    console.error(err.upgradeUrl);
+  } else if (err instanceof PlanLimitExceededError) {
+    // HTTP 403
+    console.error(err.entity); // e.g. "collections"
+    console.error(err.current, err.limit);
+    console.error(err.upgradeUrl); // May be undefined
+  } else if (err instanceof RateLimitExceededError) {
+    // HTTP 429
+    console.error(err.retryAfter); // Seconds to wait (from Retry-After)
+  } else if (err instanceof FoxnoseAPIError) {
+    console.error(err.statusCode, err.errorCode);
   }
 }
 ```
