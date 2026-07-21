@@ -131,11 +131,21 @@ describe('ManagementClient — Collection methods', () => {
   it('addApiCollection POSTs with wire field "folder"', async () => {
     const fetchMock = setupMockFetch({ folder: 'c1', api: 'my-api' });
     const client = createClient();
-    await client.addApiCollection('my-api', 'c1', { allowedMethods: ['get_one'] });
+    await client.addApiCollection('my-api', 'c1', {
+      allowedMethods: ['get_one'],
+      descriptionGetOne: 'one',
+      descriptionGetMany: 'many',
+      descriptionSearch: 'search',
+      descriptionSchema: 'schema',
+    });
     expect(fetchMock.mock.calls[0][0]).toContain('/v1/env-123/api/my-api/collections/');
     const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
     expect(body.folder).toBe('c1');
     expect(body.allowed_methods).toEqual(['get_one']);
+    expect(body.description_get_one).toBe('one');
+    expect(body.description_get_many).toBe('many');
+    expect(body.description_search).toBe('search');
+    expect(body.description_schema).toBe('schema');
   });
 
   it('listApiCollections hits the /api/{api}/collections/ subroute', async () => {
@@ -181,6 +191,172 @@ describe('ManagementClient — Collection methods', () => {
     await client.createCollectionField('c1', 'v1', { name: 'title', type: 'string' });
     const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
     expect(body.name).toBe('title');
+  });
+
+  // ----- canonical API ↔ Collection read/update -----
+
+  it('getApiCollection GETs /api/{api}/collections/{key}/', async () => {
+    const fetchMock = setupMockFetch({ folder: 'c1', api: 'my-api' });
+    const client = createClient();
+    await client.getApiCollection('my-api', 'c1');
+    expect(fetchMock.mock.calls[0][0]).toContain('/v1/env-123/api/my-api/collections/c1/');
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('GET');
+  });
+
+  it('updateApiCollection PUTs allowed_methods and descriptions', async () => {
+    const fetchMock = setupMockFetch({ folder: 'c1', api: 'my-api' });
+    const client = createClient();
+    await client.updateApiCollection('my-api', 'c1', {
+      allowedMethods: ['get_one', 'get_many'],
+      descriptionGetOne: 'one',
+      descriptionGetMany: 'many',
+      descriptionSearch: 'search',
+      descriptionSchema: 'schema',
+    });
+    expect(fetchMock.mock.calls[0][0]).toContain('/v1/env-123/api/my-api/collections/c1/');
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('PUT');
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.allowed_methods).toEqual(['get_one', 'get_many']);
+    expect(body.description_get_one).toBe('one');
+    expect(body.description_get_many).toBe('many');
+    expect(body.description_search).toBe('search');
+    expect(body.description_schema).toBe('schema');
+  });
+
+  // ----- canonical Collection schema versions -----
+
+  it('listCollectionVersions GETs the versions base path', async () => {
+    const fetchMock = setupMockFetch({ count: 0, results: [] });
+    const client = createClient();
+    await client.listCollectionVersions('c1');
+    expect(fetchMock.mock.calls[0][0]).toContain('/v1/env-123/collections/c1/model/versions/');
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('GET');
+  });
+
+  it('createCollectionVersion POSTs payload and passes ?copy_from', async () => {
+    const fetchMock = setupMockFetch({ key: 'v2' });
+    const client = createClient();
+    await client.createCollectionVersion('c1', { name: 'draft' }, { copyFrom: 'v1' });
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('/v1/env-123/collections/c1/model/versions/');
+    expect(url).toContain('copy_from=v1');
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('POST');
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.name).toBe('draft');
+  });
+
+  it('getCollectionVersion passes ?include_schema when requested', async () => {
+    const fetchMock = setupMockFetch({ key: 'v1' });
+    const client = createClient();
+    await client.getCollectionVersion('c1', 'v1', { includeSchema: true });
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('/v1/env-123/collections/c1/model/versions/v1/');
+    expect(url).toContain('include_schema=true');
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('GET');
+  });
+
+  it('updateCollectionVersion PUTs payload to the version path', async () => {
+    const fetchMock = setupMockFetch({ key: 'v1' });
+    const client = createClient();
+    await client.updateCollectionVersion('c1', 'v1', { name: 'renamed' });
+    expect(fetchMock.mock.calls[0][0]).toContain(
+      '/v1/env-123/collections/c1/model/versions/v1/',
+    );
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('PUT');
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.name).toBe('renamed');
+  });
+
+  it('deleteCollectionVersion DELETEs the version path', async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    globalThis.fetch = fetchMock;
+    const client = createClient();
+    await client.deleteCollectionVersion('c1', 'v1');
+    expect(fetchMock.mock.calls[0][0]).toContain(
+      '/v1/env-123/collections/c1/model/versions/v1/',
+    );
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('DELETE');
+  });
+
+  // ----- canonical Collection field read/update/delete -----
+
+  it('getCollectionField GETs schema/tree/field/ with ?path', async () => {
+    const fetchMock = setupMockFetch({ key: 'f1' });
+    const client = createClient();
+    await client.getCollectionField('c1', 'v1', 'title');
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('/v1/env-123/collections/c1/model/versions/v1/schema/tree/field/');
+    expect(url).toContain('path=title');
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('GET');
+  });
+
+  it('updateCollectionField PUTs payload with ?path', async () => {
+    const fetchMock = setupMockFetch({ key: 'f1' });
+    const client = createClient();
+    await client.updateCollectionField('c1', 'v1', 'title', { name: 'heading' });
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('/v1/env-123/collections/c1/model/versions/v1/schema/tree/field/');
+    expect(url).toContain('path=title');
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('PUT');
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.name).toBe('heading');
+  });
+
+  it('deleteCollectionField DELETEs schema/tree/field/ with ?path', async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    globalThis.fetch = fetchMock;
+    const client = createClient();
+    await client.deleteCollectionField('c1', 'v1', 'title');
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('/v1/env-123/collections/c1/model/versions/v1/schema/tree/field/');
+    expect(url).toContain('path=title');
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('DELETE');
+  });
+
+  // ----- Component schema versions + fields -----
+
+  it('getComponentVersion passes ?include_schema when requested', async () => {
+    const fetchMock = setupMockFetch({ key: 'v1' });
+    const client = createClient();
+    await client.getComponentVersion('cmp1', 'v1', { includeSchema: true });
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('/v1/env-123/components/cmp1/model/versions/v1/');
+    expect(url).toContain('include_schema=true');
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('GET');
+  });
+
+  it('updateComponentVersion PUTs payload to the version path', async () => {
+    const fetchMock = setupMockFetch({ key: 'v1' });
+    const client = createClient();
+    await client.updateComponentVersion('cmp1', 'v1', { name: 'renamed' });
+    expect(fetchMock.mock.calls[0][0]).toContain(
+      '/v1/env-123/components/cmp1/model/versions/v1/',
+    );
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('PUT');
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.name).toBe('renamed');
+  });
+
+  it('getComponentField GETs schema/tree/field/ with ?path', async () => {
+    const fetchMock = setupMockFetch({ key: 'f1' });
+    const client = createClient();
+    await client.getComponentField('cmp1', 'v1', 'title');
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('/v1/env-123/components/cmp1/model/versions/v1/schema/tree/field/');
+    expect(url).toContain('path=title');
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('GET');
+  });
+
+  it('updateComponentField PUTs payload with ?path', async () => {
+    const fetchMock = setupMockFetch({ key: 'f1' });
+    const client = createClient();
+    await client.updateComponentField('cmp1', 'v1', 'title', { name: 'heading' });
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('/v1/env-123/components/cmp1/model/versions/v1/schema/tree/field/');
+    expect(url).toContain('path=title');
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('PUT');
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.name).toBe('heading');
   });
 
   // ----- type alias sanity -----
@@ -249,6 +425,17 @@ describe('ManagementClient — Folder deprecation aliases', () => {
     await client.addApiFolder('my-api', 'c1', { allowedMethods: ['get_one'] });
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain('addApiFolder');
+  });
+
+  it('getApiFolder warns and hits the legacy /api/{api}/folders/ URL', async () => {
+    const fetchMock = setupMockFetch({ folder: 'c1', api: 'my-api' });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const client = createClient();
+    await client.getApiFolder('my-api', 'c1');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('getApiFolder');
+    expect(fetchMock.mock.calls[0][0]).toContain('/v1/env-123/api/my-api/folders/c1/');
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('GET');
   });
 
   it('publishFolderVersion emits deprecation warn', async () => {
