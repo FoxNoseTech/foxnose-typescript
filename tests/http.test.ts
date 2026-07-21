@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpTransport } from '../src/http.js';
-import { FoxnoseAPIError, FoxnoseTransportError } from '../src/errors.js';
+import {
+  FoxnoseAPIError,
+  FoxnoseTransportError,
+  SpendCapExceededError,
+  PlanExhaustedError,
+  PlanLimitExceededError,
+  RateLimitExceededError,
+} from '../src/errors.js';
 import type { FoxnoseConfig } from '../src/config.js';
 
 const baseConfig: FoxnoseConfig = {
@@ -213,6 +220,254 @@ describe('HttpTransport', () => {
       });
 
       await expect(transport.request('GET', '/test')).rejects.toThrow(FoxnoseTransportError);
+    });
+  });
+
+  describe('billing error mapping', () => {
+    it('maps 402 spend_cap_reached to SpendCapExceededError without retrying', async () => {
+      const fetchMock = mockFetch([
+        {
+          status: 402,
+          body: {
+            error_code: 'spend_cap_reached',
+            cap_usd: 25,
+            cycle_resets_at: '2026-08-01T00:00:00Z',
+            raise_cap_url: 'https://foxnose.net/billing/cap',
+          },
+        },
+      ]);
+      globalThis.fetch = fetchMock;
+
+      const transport = new HttpTransport({ config: baseConfig });
+
+      let caught: unknown;
+      try {
+        await transport.request('GET', '/resources');
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(SpendCapExceededError);
+      expect(caught).toBeInstanceOf(FoxnoseAPIError);
+      const capErr = caught as SpendCapExceededError;
+      expect(capErr.statusCode).toBe(402);
+      expect(capErr.capUsd).toBe(25);
+      expect(capErr.cycleResetsAt).toBe('2026-08-01T00:00:00Z');
+      expect(capErr.raiseCapUrl).toBe('https://foxnose.net/billing/cap');
+      // 402 bodies carry no `message`, so the default is used (not the raw JSON).
+      expect(capErr.message).toContain('Spend cap reached');
+      // 402 is not a retryable status.
+      expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    it('maps 402 plan_exhausted to PlanExhaustedError', async () => {
+      const fetchMock = mockFetch([
+        {
+          status: 402,
+          body: {
+            error_code: 'plan_exhausted',
+            axis: 'writes',
+            window_resets_at: '2026-08-01T00:00:00Z',
+            upgrade_url: 'https://foxnose.net/billing/upgrade',
+          },
+        },
+      ]);
+      globalThis.fetch = fetchMock;
+
+      const transport = new HttpTransport({ config: baseConfig });
+
+      let caught: unknown;
+      try {
+        await transport.request('GET', '/resources');
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(PlanExhaustedError);
+      const planErr = caught as PlanExhaustedError;
+      expect(planErr.axis).toBe('writes');
+      expect(planErr.windowResetsAt).toBe('2026-08-01T00:00:00Z');
+      expect(planErr.upgradeUrl).toBe('https://foxnose.net/billing/upgrade');
+      expect(planErr.message).toContain('Plan allowance exhausted');
+    });
+
+    it('maps 403 plan_limit_exceeded to PlanLimitExceededError from detail', async () => {
+      const fetchMock = mockFetch([
+        {
+          status: 403,
+          body: {
+            message: 'Plan limit exceeded',
+            error_code: 'plan_limit_exceeded',
+            detail: {
+              entity: 'collections',
+              current: 10,
+              limit: 10,
+              upgrade_url: 'https://foxnose.net/billing/upgrade',
+            },
+          },
+        },
+      ]);
+      globalThis.fetch = fetchMock;
+
+      const transport = new HttpTransport({ config: baseConfig });
+
+      let caught: unknown;
+      try {
+        await transport.request('GET', '/collections');
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(PlanLimitExceededError);
+      const limitErr = caught as PlanLimitExceededError;
+      expect(limitErr.entity).toBe('collections');
+      expect(limitErr.current).toBe(10);
+      expect(limitErr.limit).toBe(10);
+      expect(limitErr.upgradeUrl).toBe('https://foxnose.net/billing/upgrade');
+    });
+
+    it('maps 403 plan_limit_exceeded with no upgrade_url', async () => {
+      const fetchMock = mockFetch([
+        {
+          status: 403,
+          body: {
+            message: 'Plan limit exceeded',
+            error_code: 'plan_limit_exceeded',
+            detail: { entity: 'environments', current: 3, limit: 3 },
+          },
+        },
+      ]);
+      globalThis.fetch = fetchMock;
+
+      const transport = new HttpTransport({ config: baseConfig });
+
+      let caught: unknown;
+      try {
+        await transport.request('GET', '/environments');
+      } catch (err) {
+        caught = err;
+      }
+      const limitErr = caught as PlanLimitExceededError;
+      expect(limitErr).toBeInstanceOf(PlanLimitExceededError);
+      expect(limitErr.entity).toBe('environments');
+      expect(limitErr.current).toBe(3);
+      expect(limitErr.limit).toBe(3);
+      expect(limitErr.upgradeUrl).toBeUndefined();
+    });
+
+    it('maps 429 rate_limited on POST immediately with parsed Retry-After', async () => {
+      const fetchMock = mockFetch([
+        {
+          status: 429,
+          body: { error_code: 'rate_limited', message: 'Rate limit exceeded' },
+          headers: { 'Retry-After': '12' },
+        },
+      ]);
+      globalThis.fetch = fetchMock;
+
+      const transport = new HttpTransport({ config: baseConfig });
+
+      let caught: unknown;
+      try {
+        await transport.request('POST', '/items', { jsonBody: { name: 'x' } });
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(RateLimitExceededError);
+      expect((caught as RateLimitExceededError).retryAfter).toBe(12);
+      // POST is not retried by default.
+      expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    it('retries 429 rate_limited on GET then throws RateLimitExceededError', async () => {
+      const fetchMock = mockFetch([
+        { status: 429, body: { error_code: 'rate_limited', message: 'Rate limit exceeded' } },
+        { status: 429, body: { error_code: 'rate_limited', message: 'Rate limit exceeded' } },
+        {
+          status: 429,
+          body: { error_code: 'rate_limited', message: 'Rate limit exceeded' },
+          headers: { 'Retry-After': '5' },
+        },
+      ]);
+      globalThis.fetch = fetchMock;
+
+      const transport = new HttpTransport({
+        config: baseConfig,
+        retryConfig: { attempts: 3, backoffFactor: 0, statusCodes: [429], methods: ['GET'] },
+      });
+
+      let caught: unknown;
+      try {
+        await transport.request('GET', '/resources');
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(RateLimitExceededError);
+      expect((caught as RateLimitExceededError).retryAfter).toBe(5);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('keeps unknown codes on mapped statuses as generic FoxnoseAPIError', async () => {
+      const fetchMock = mockFetch([{ status: 402, body: { error_code: 'something_new' } }]);
+      globalThis.fetch = fetchMock;
+
+      const transport = new HttpTransport({ config: baseConfig });
+
+      let caught: unknown;
+      try {
+        await transport.request('GET', '/resources');
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(FoxnoseAPIError);
+      expect((caught as FoxnoseAPIError).constructor).toBe(FoxnoseAPIError);
+      expect(caught).not.toBeInstanceOf(SpendCapExceededError);
+
+      const fetchMock2 = mockFetch([{ status: 429, body: { error_code: 'insufficient_units' } }]);
+      globalThis.fetch = fetchMock2;
+
+      let caught2: unknown;
+      try {
+        await transport.request('POST', '/items', { jsonBody: {} });
+      } catch (err) {
+        caught2 = err;
+      }
+      expect((caught2 as FoxnoseAPIError).constructor).toBe(FoxnoseAPIError);
+      expect(caught2).not.toBeInstanceOf(RateLimitExceededError);
+    });
+
+    it('falls through to generic FoxnoseAPIError for malformed bodies on mapped statuses', async () => {
+      const transport = new HttpTransport({
+        config: baseConfig,
+        retryConfig: { attempts: 1, backoffFactor: 0, statusCodes: [], methods: [] },
+      });
+
+      // Bare JSON string body.
+      globalThis.fetch = vi.fn(async () => new Response('"just a string"', { status: 402 }));
+      let caught: unknown;
+      try {
+        await transport.request('POST', '/x', { jsonBody: {} });
+      } catch (err) {
+        caught = err;
+      }
+      expect((caught as FoxnoseAPIError).constructor).toBe(FoxnoseAPIError);
+
+      // JSON null body.
+      globalThis.fetch = vi.fn(async () => new Response('null', { status: 429 }));
+      let caught2: unknown;
+      try {
+        await transport.request('POST', '/x', { jsonBody: {} });
+      } catch (err) {
+        caught2 = err;
+      }
+      expect((caught2 as FoxnoseAPIError).constructor).toBe(FoxnoseAPIError);
+
+      // JSON array body.
+      globalThis.fetch = vi.fn(async () => new Response('[1,2,3]', { status: 402 }));
+      let caught3: unknown;
+      try {
+        await transport.request('POST', '/x', { jsonBody: {} });
+      } catch (err) {
+        caught3 = err;
+      }
+      expect((caught3 as FoxnoseAPIError).constructor).toBe(FoxnoseAPIError);
     });
   });
 
