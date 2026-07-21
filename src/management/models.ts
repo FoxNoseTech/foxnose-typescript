@@ -20,7 +20,6 @@ export interface ResourceSummary {
   created_at: string;
   vectors_size: number;
   name?: string | null;
-  component?: string | null;
   resource_owner?: string | null;
   current_revision?: string | null;
   external_id?: string | null;
@@ -50,7 +49,6 @@ export interface FolderSummary {
   key: string;
   name: string;
   alias: string;
-  folder_type: string;
   content_type: string;
   strict_reference: boolean;
   created_at: string;
@@ -64,6 +62,12 @@ export interface FolderSummary {
 }
 
 export type FolderList = PaginatedResponse<FolderSummary>;
+
+// Collection-named aliases — same shape, preferred name in new code.
+/** @public Alias of {@link FolderSummary}. */
+export type CollectionSummary = FolderSummary;
+/** @public Alias of {@link FolderList}. */
+export type CollectionList = FolderList;
 
 // ---------------------------------------------------------------------------
 // Components
@@ -117,6 +121,130 @@ export interface FieldSummary {
 
 export type SchemaVersionList = PaginatedResponse<SchemaVersionSummary>;
 export type FieldList = PaginatedResponse<FieldSummary>;
+
+// ---------------------------------------------------------------------------
+// Component composition: nested field meta + sync_component
+// ---------------------------------------------------------------------------
+
+/**
+ * Helper shape for the `meta` block of a Collection `nested` field.
+ *
+ * A `nested` field on a Collection schema embeds a Component schema at a
+ * specific published version. The pin is required: even in auto-update
+ * mode, `component_version` stores the most recently resolved version and
+ * acts as a fallback if a future Component publish fails compatibility.
+ *
+ * Pass an object of this shape (or use {@link nestedFieldMeta}) as the
+ * `meta` value when calling
+ * {@link ManagementClient.createCollectionField} or
+ * {@link ManagementClient.updateCollectionField}.
+ *
+ * @example
+ * ```ts
+ * await client.createCollectionField('articles', 'v1-draft', {
+ *   key: 'seo',
+ *   name: 'SEO',
+ *   type: 'nested',
+ *   required: true,
+ *   meta: nestedFieldMeta({
+ *     component: 'cmp-seo-metadata',
+ *     componentVersion: 'ver-abc12345',
+ *     autoUpdate: true,
+ *   }),
+ * });
+ * ```
+ */
+export interface NestedFieldMeta {
+  component: string;
+  component_version: string;
+  auto_update?: boolean;
+  [extra: string]: any;
+}
+
+/**
+ * Build a {@link NestedFieldMeta} payload from camelCase ergonomics.
+ *
+ * The wire shape uses snake_case keys (`component_version`, `auto_update`);
+ * this helper lets callers pass `componentVersion` / `autoUpdate` and
+ * emits the right object.
+ */
+export function nestedFieldMeta(opts: {
+  component: string;
+  componentVersion: string;
+  autoUpdate?: boolean;
+  /**
+   * Any additional meta keys (title, description, …) the API accepts.
+   * `component`, `component_version`, and `auto_update` are reserved and
+   * cannot be overridden via `extra` — passing them throws so callers see
+   * the conflict at the call-site rather than silently winning the merge.
+   */
+  extra?: Record<string, any>;
+}): NestedFieldMeta {
+  if (opts.extra) {
+    const reserved = ['component', 'component_version', 'auto_update'];
+    const collisions = reserved.filter((k) =>
+      Object.prototype.hasOwnProperty.call(opts.extra, k),
+    );
+    if (collisions.length > 0) {
+      throw new Error(
+        `nestedFieldMeta: 'extra' must not include reserved keys: ${collisions.join(', ')}`,
+      );
+    }
+  }
+  return {
+    ...(opts.extra ?? {}),
+    component: opts.component,
+    component_version: opts.componentVersion,
+    auto_update: opts.autoUpdate ?? false,
+  };
+}
+
+/**
+ * One entry in the `skipped` list of a sync_component response.
+ *
+ * `reason` is one of:
+ *   - `"not_requested"` — `field_paths` was supplied and this path was not in it.
+ *   - `"auto_update_mode"` — the field has `meta.auto_update=true`.
+ *   - `"already_at_target"` — the field is already pinned to the requested
+ *     target version.
+ *   - `"component_not_found"` — referenced Component does not exist in this
+ *     environment.
+ *   - `"component_unpublished"` — Component has no published `current_version`.
+ */
+export interface SyncComponentSkippedItem {
+  path: string;
+  reason: string;
+  [extra: string]: any;
+}
+
+/**
+ * Response payload from
+ * `POST /v1/{env}/collections/{key}/sync_component/`.
+ *
+ * - `syncedPaths` — field paths whose `meta.component_version` was advanced.
+ * - `skipped` — per-path skip records explaining why each was left alone.
+ * - `schemaVersion` — UID of the newly published Collection schema version.
+ *   `null` when no advance was needed (every requested path was skipped).
+ */
+export interface SyncComponentResponse {
+  synced_paths: string[];
+  skipped: SyncComponentSkippedItem[];
+  schema_version: string | null;
+  [extra: string]: any;
+}
+
+/**
+ * One structured conflict entry inside a 409 `component_sync_conflict`
+ * error detail. `blocking_reason` is one of:
+ *   - `"required_field_added_no_default"`
+ *   - `"type_narrowed"`
+ *   - `"field_removed"`
+ */
+export interface ComponentSyncConflictDetail {
+  field_path: string;
+  blocking_reason: string;
+  [extra: string]: any;
+}
 
 // ---------------------------------------------------------------------------
 // Regions & Projects
@@ -280,6 +408,12 @@ export interface APIFolderSummary {
 
 export type APIFolderList = PaginatedResponse<APIFolderSummary>;
 
+// Collection-named aliases.
+/** @public Alias of {@link APIFolderSummary}. */
+export type APICollectionSummary = APIFolderSummary;
+/** @public Alias of {@link APIFolderList}. */
+export type APICollectionList = APIFolderList;
+
 // ---------------------------------------------------------------------------
 // Organizations
 // ---------------------------------------------------------------------------
@@ -395,7 +529,6 @@ export interface OrganizationUsage {
 export interface BatchUpsertItem {
   external_id: string;
   payload: Record<string, any>;
-  component?: string | null;
 }
 
 export interface BatchItemError {
@@ -414,6 +547,8 @@ export interface BatchUpsertResult {
 // ---------------------------------------------------------------------------
 
 export type FolderRef = string | FolderSummary;
+/** @public Alias of {@link FolderRef} — preferred name in new code. */
+export type CollectionRef = FolderRef;
 export type ResourceRef = string | ResourceSummary;
 export type RevisionRef = string | RevisionSummary;
 export type ComponentRef = string | ComponentSummary;

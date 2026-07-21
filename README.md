@@ -48,12 +48,12 @@ const client = new ManagementClient({
   auth,
 });
 
-// List folders
-const folders = await client.listFolders();
-console.log(folders.results);
+// List collections
+const collections = await client.listCollections();
+console.log(collections.results);
 
 // Create a resource
-const resource = await client.createResource('my-folder-key', {
+const resource = await client.createResource('my-collection-key', {
   data: { title: 'Hello World' },
 });
 console.log(resource.key);
@@ -61,6 +61,62 @@ console.log(resource.key);
 // Clean up
 client.close();
 ```
+
+> **Note (0.4.0):** Folder-named methods (`listFolders`, `createFolder`,
+> `addApiFolder`, `listFolderVersions`, `listFolderFields`, etc.) remain as
+> `@deprecated` aliases that emit a one-shot `console.warn` on first use per
+> process. They keep their original wire behaviour (hitting the legacy
+> `/folders/...` URL alias on the server) and will be removed in **1.0**.
+> Prefer the `*Collection*` names in new code.
+
+### Components on Collections
+
+Collections can embed Components as nested fields with explicit pin
+semantics (`component`, `component_version`, `auto_update`). The
+`nestedFieldMeta` helper builds the `meta` block with camelCase
+ergonomics, and `syncCollectionComponent` advances pinned fields to a
+target Component version on demand.
+
+```typescript
+import { ManagementClient, JWTAuth, nestedFieldMeta } from '@foxnose/sdk';
+
+const client = new ManagementClient({
+  config: { baseUrl: 'https://api.foxnose.com' },
+  environmentKey: 'prod',
+  auth: new JWTAuth('ACCESS_TOKEN'),
+});
+
+// Embed a Component as a pinned nested field on a Collection draft.
+await client.createCollectionField('articles', 'v2-draft', {
+  key: 'seo',
+  name: 'SEO',
+  type: 'nested',
+  required: true,
+  meta: nestedFieldMeta({
+    component: 'cmp-seo-metadata',
+    componentVersion: 'ver-abc12345',
+    autoUpdate: false, // default — pin until explicit sync
+  }),
+});
+
+// Later, advance every pinned nested field to its Component's
+// current version (empty body = sync all pinned).
+const result = await client.syncCollectionComponent('articles');
+console.log(result.synced_paths, result.schema_version);
+
+// Advance specific paths to a chosen Component version.
+await client.syncCollectionComponent('articles', {
+  fieldPaths: ['seo'],
+  toVersions: { seo: 'ver-def67890' },
+});
+```
+
+`syncCollectionComponent` returns a `SyncComponentResponse` with
+`synced_paths`, `skipped` (per-path reasons), and `schema_version`
+(UID of the newly published Collection schema version, or `null` if no
+field needed advancing). On compatibility conflict the server returns
+409 `component_sync_conflict`; quota exhaustion returns 422
+`too_many_versions`. Both surface as `FoxnoseAPIError`.
 
 ### Flux Client
 
@@ -233,7 +289,7 @@ All API errors are thrown as typed exceptions:
 import { FoxnoseAPIError, FoxnoseTransportError } from '@foxnose/sdk';
 
 try {
-  await client.getResource('folder', 'nonexistent-key');
+  await client.getResource('collection', 'nonexistent-key');
 } catch (err) {
   if (err instanceof FoxnoseAPIError) {
     console.error(err.statusCode); // 404
@@ -241,6 +297,48 @@ try {
     console.error(err.detail); // Additional error details
   } else if (err instanceof FoxnoseTransportError) {
     console.error('Network error:', err.message);
+  }
+}
+```
+
+### Billing errors
+
+Billing-related responses are thrown as typed subclasses of `FoxnoseAPIError`,
+so an existing `catch (err) { if (err instanceof FoxnoseAPIError) ... }` keeps
+working. Narrow to a subclass to read its typed fields:
+
+```typescript
+import {
+  FoxnoseAPIError,
+  SpendCapExceededError,
+  PlanExhaustedError,
+  PlanLimitExceededError,
+  RateLimitExceededError,
+} from '@foxnose/sdk';
+
+try {
+  await client.createResource('collection', payload);
+} catch (err) {
+  if (err instanceof SpendCapExceededError) {
+    // HTTP 402
+    console.error(err.capUsd); // Spend cap in USD (or null)
+    console.error(err.cycleResetsAt); // ISO timestamp
+    console.error(err.raiseCapUrl); // Where to raise the cap
+  } else if (err instanceof PlanExhaustedError) {
+    // HTTP 402
+    console.error(err.axis); // e.g. "retrievals", "writes"
+    console.error(err.windowResetsAt); // ISO timestamp
+    console.error(err.upgradeUrl);
+  } else if (err instanceof PlanLimitExceededError) {
+    // HTTP 403
+    console.error(err.entity); // e.g. "collections"
+    console.error(err.current, err.limit);
+    console.error(err.upgradeUrl); // May be undefined
+  } else if (err instanceof RateLimitExceededError) {
+    // HTTP 429
+    console.error(err.retryAfter); // Seconds to wait (from Retry-After)
+  } else if (err instanceof FoxnoseAPIError) {
+    console.error(err.statusCode, err.errorCode);
   }
 }
 ```

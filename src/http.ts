@@ -2,7 +2,7 @@ import { AnonymousAuth } from './auth/anonymous.js';
 import type { AuthStrategy, RequestData } from './auth/types.js';
 import type { FoxnoseConfig, RetryConfig } from './config.js';
 import { DEFAULT_RETRY_CONFIG } from './config.js';
-import { FoxnoseAPIError, FoxnoseTransportError } from './errors.js';
+import { buildAPIError, FoxnoseTransportError } from './errors.js';
 
 /**
  * Shared HTTP transport with retry logic built on native `fetch`.
@@ -227,10 +227,12 @@ export class HttpTransport {
       if (text) {
         try {
           const payload = JSON.parse(text);
-          message = payload.message ?? message;
-          errorCode = payload.error_code;
-          detail = payload.detail;
           body = payload;
+          if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+            message = payload.message ?? message;
+            errorCode = payload.error_code;
+            detail = payload.detail;
+          }
         } catch {
           body = text;
         }
@@ -244,7 +246,7 @@ export class HttpTransport {
       responseHeaders[key] = value;
     });
 
-    throw new FoxnoseAPIError({
+    throw buildAPIError({
       message: message || 'API request failed',
       statusCode: response.status,
       errorCode,

@@ -18,6 +18,10 @@ export {
   FoxnoseAPIError,
   FoxnoseAuthError,
   FoxnoseTransportError,
+  SpendCapExceededError,
+  PlanExhaustedError,
+  PlanLimitExceededError,
+  RateLimitExceededError,
 } from './errors.js';
 
 // HTTP Transport
@@ -58,12 +62,18 @@ export type {
   RevisionList,
   FolderSummary,
   FolderList,
+  CollectionSummary,
+  CollectionList,
   ComponentSummary,
   ComponentList,
   SchemaVersionSummary,
   SchemaVersionList,
   FieldSummary,
   FieldList,
+  NestedFieldMeta,
+  SyncComponentSkippedItem,
+  SyncComponentResponse,
+  ComponentSyncConflictDetail,
   RegionInfo,
   ProjectSummary,
   ProjectList,
@@ -86,6 +96,8 @@ export type {
   APIList,
   APIFolderSummary,
   APIFolderList,
+  APICollectionSummary,
+  APICollectionList,
   OrganizationOwner,
   OrganizationSummary,
   OrganizationList,
@@ -103,6 +115,7 @@ export type {
   BatchUpsertResult,
   // Ref types
   FolderRef,
+  CollectionRef,
   ResourceRef,
   RevisionRef,
   ComponentRef,
@@ -117,6 +130,6 @@ export type {
   APIRef,
 } from './management/models.js';
 
-export { resolveKey } from './management/models.js';
+export { resolveKey, nestedFieldMeta } from './management/models.js';
 
 export { SDK_VERSION as VERSION } from './config.js';
