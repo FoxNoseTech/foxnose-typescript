@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FluxClient } from '../../src/flux/client.js';
 import { SearchMode, buildSearchBody, mergeExtra } from '../../src/flux/models.js';
 import type { AuthStrategy, RequestData } from '../../src/auth/types.js';
+import { ExternalIdConflictError, UpstreamError, FoxnoseTransportError } from '../../src/errors.js';
 
 const dummyAuth: AuthStrategy = {
   buildHeaders(_request: RequestData) {
@@ -356,6 +357,80 @@ describe('FluxClient', () => {
 
       const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
       expect(body).toEqual({ find_text: { query: 'old style' }, limit: 5 });
+    });
+  });
+
+  describe('writes', () => {
+    const created = { resource_key: 'res_1', revision_key: 'rev_1', write_units: 1, published: true };
+
+    it('createResource POSTs to the collection root with a trailing slash', async () => {
+      const fetchMock = setupMockFetch(created, 201);
+      const client = createClient();
+      const res = await client.createResource('articles', { title: 'Hi' }, { key: 'ext-1' });
+
+      expect(res).toMatchObject({ resource_key: 'res_1', published: true });
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://env-123.fxns.io/v1/articles/');
+      expect(init?.method).toBe('POST');
+      expect(JSON.parse(init?.body as string)).toEqual({ data: { title: 'Hi' }, key: 'ext-1' });
+    });
+
+    it('updateResource PUTs to the resource path (nested collection)', async () => {
+      const fetchMock = setupMockFetch(created, 200);
+      const client = createClient();
+      await client.updateResource('users/usr_1/memories', 'res_1', { title: 'Bye' });
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://env-123.fxns.io/v1/users/usr_1/memories/res_1/');
+      expect(init?.method).toBe('PUT');
+      expect(JSON.parse(init?.body as string)).toEqual({ data: { title: 'Bye' } });
+    });
+
+    it('surfaces a typed conflict error', async () => {
+      setupMockFetch({ message: 'dup', error_code: 'external_id_conflict', detail: null }, 409);
+      const client = createClient();
+      await expect(
+        client.createResource('articles', { title: 'Hi' }, { key: 'dup' }),
+      ).rejects.toBeInstanceOf(ExternalIdConflictError);
+    });
+
+    it('does not retry a write on 502 upstream_error', async () => {
+      const fetchMock = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ error_code: 'upstream_error', message: 'Upstream write failed', detail: null }),
+            { status: 502 },
+          ),
+      );
+      globalThis.fetch = fetchMock;
+      // attempts > 1 so a retryable request WOULD repeat; the write must not.
+      const client = new FluxClient({
+        baseUrl: 'https://env-123.fxns.io',
+        apiPrefix: 'v1',
+        auth: dummyAuth,
+        retryConfig: { attempts: 3, backoffFactor: 0, statusCodes: [502], methods: ['GET', 'PUT'] },
+      });
+      await expect(client.updateResource('articles', 'res_1', { title: 'x' })).rejects.toBeInstanceOf(
+        UpstreamError,
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry a write when fetch rejects (transport error)', async () => {
+      const fetchMock = vi.fn(async () => {
+        throw new Error('network down');
+      });
+      globalThis.fetch = fetchMock;
+      const client = new FluxClient({
+        baseUrl: 'https://env-123.fxns.io',
+        apiPrefix: 'v1',
+        auth: dummyAuth,
+        retryConfig: { attempts: 3, backoffFactor: 0, statusCodes: [502], methods: ['GET', 'PUT', 'POST'] },
+      });
+      await expect(client.createResource('articles', { title: 'Hi' })).rejects.toBeInstanceOf(
+        FoxnoseTransportError,
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
   });
 });

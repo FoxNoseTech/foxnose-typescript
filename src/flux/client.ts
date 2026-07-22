@@ -139,6 +139,56 @@ export class FluxClient {
     return this.transport.request('POST', path, { jsonBody: body });
   }
 
+  /**
+   * Create a resource in a collection and publish it immediately.
+   *
+   * `folderPath` is the collection path (e.g. `articles` or a nested path such
+   * as `users/usr_1/memories`). `options.key` is an optional external
+   * identifier for deduplication — reusing an existing key raises
+   * {@link ExternalIdConflictError}. The response carries `resource_key`,
+   * `revision_key`, `write_units`, and `published`.
+   *
+   * Writes require an authenticated key with write access: an anonymous caller
+   * gets 401, a key without the `create` grant gets a generic 403
+   * (`access_denied`), and a collection whose connection does not allow writes
+   * raises {@link CollectionNotWritableError}.
+   *
+   * Writes are never retried automatically: a failed write's outcome is
+   * unknown, so re-read with a GET before retrying.
+   */
+  async createResource<T = any>(
+    folderPath: string,
+    data: Record<string, any>,
+    options?: { key?: string },
+  ): Promise<T> {
+    const path = this.buildPath(folderPath, '/');
+    const body: Record<string, any> = { data };
+    if (options?.key !== undefined) {
+      body.key = options.key;
+    }
+    return this.transport.request('POST', path, { jsonBody: body, allowRetries: false });
+  }
+
+  /**
+   * Replace a resource's document and publish a new revision. This is a
+   * full-document replace, not a partial merge: fields absent from `data` are
+   * removed.
+   *
+   * Writes require an authenticated key with write access: an anonymous caller
+   * gets 401, a key without the `update` grant gets a generic 403
+   * (`access_denied`), and a collection whose connection does not allow writes
+   * raises {@link CollectionNotWritableError}. Like {@link createResource}, it
+   * is never retried automatically.
+   */
+  async updateResource<T = any>(
+    folderPath: string,
+    resourceKey: string,
+    data: Record<string, any>,
+  ): Promise<T> {
+    const path = this.buildPath(folderPath, `/${resourceKey}/`);
+    return this.transport.request('PUT', path, { jsonBody: { data }, allowRetries: false });
+  }
+
   /** Semantic search using auto-generated embeddings. */
   async vectorSearch<T = any>(folderPath: string, options: VectorSearchOptions): Promise<T> {
     const { query, fields, top_k = 10, similarity_threshold, limit, offset, ...rest } = options;

@@ -27,6 +27,7 @@ export class HttpTransport {
       content?: Uint8Array;
       headers?: Record<string, string>;
       parseJson?: boolean;
+      allowRetries?: boolean;
     },
   ): Promise<any> {
     const parseJson = options?.parseJson ?? true;
@@ -165,8 +166,10 @@ export class HttpTransport {
       jsonBody?: any;
       content?: Uint8Array;
       headers?: Record<string, string>;
+      allowRetries?: boolean;
     },
   ): Promise<Response> {
+    const allowRetries = options?.allowRetries !== false;
     for (let attempt = 1; attempt <= this.retry.attempts; attempt++) {
       const { url, init } = this.buildRequest(method, path, options);
 
@@ -179,7 +182,7 @@ export class HttpTransport {
         response = await fetch(url, init);
       } catch (err) {
         clearTimeout(timeoutId);
-        const delay = this.handleTransportError(err, method, attempt);
+        const delay = this.handleTransportError(err, method, attempt, !allowRetries);
         if (delay > 0) {
           await this.sleep(delay);
         }
@@ -189,7 +192,7 @@ export class HttpTransport {
       }
 
       if (response.status >= 400) {
-        if (this.shouldRetry(method, response.status) && attempt < this.retry.attempts) {
+        if (allowRetries && this.shouldRetry(method, response.status) && attempt < this.retry.attempts) {
           const delay = this.computeDelay(attempt, response.headers.get('Retry-After'));
           if (delay > 0) {
             await this.sleep(delay);
@@ -205,9 +208,16 @@ export class HttpTransport {
     throw new FoxnoseTransportError('All retry attempts exhausted');
   }
 
-  private handleTransportError(err: unknown, method: string, attempt: number): number {
+  private handleTransportError(
+    err: unknown,
+    method: string,
+    attempt: number,
+    forbidRetry = false,
+  ): number {
     const canRetry =
-      this.retry.methods.includes(method.toUpperCase()) && attempt < this.retry.attempts;
+      !forbidRetry &&
+      this.retry.methods.includes(method.toUpperCase()) &&
+      attempt < this.retry.attempts;
     if (!canRetry) {
       const message = err instanceof Error ? err.message : String(err);
       throw new FoxnoseTransportError(message);

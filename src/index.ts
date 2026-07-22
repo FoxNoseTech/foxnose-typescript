@@ -22,6 +22,10 @@ export {
   PlanExhaustedError,
   PlanLimitExceededError,
   RateLimitExceededError,
+  CollectionNotWritableError,
+  ExternalIdConflictError,
+  ContentValidationFailedError,
+  UpstreamError,
 } from './errors.js';
 
 // HTTP Transport

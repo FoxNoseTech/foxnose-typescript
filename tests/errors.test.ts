@@ -8,6 +8,10 @@ import {
   PlanExhaustedError,
   PlanLimitExceededError,
   RateLimitExceededError,
+  CollectionNotWritableError,
+  ExternalIdConflictError,
+  ContentValidationFailedError,
+  UpstreamError,
   buildAPIError,
 } from '../src/errors.js';
 
@@ -263,5 +267,58 @@ describe('buildAPIError', () => {
       expect(err).toBeInstanceOf(FoxnoseAPIError);
       expect(err).toBeInstanceOf(FoxnoseError);
     }
+  });
+});
+
+describe('buildAPIError — write errors', () => {
+  it('maps 403 collection_not_writable', () => {
+    const err = buildAPIError({ message: 'x', statusCode: 403, errorCode: 'collection_not_writable' });
+    expect(err).toBeInstanceOf(CollectionNotWritableError);
+    expect(err).toBeInstanceOf(FoxnoseAPIError);
+    expect(err.statusCode).toBe(403);
+  });
+
+  it('maps 409 external_id_conflict', () => {
+    const err = buildAPIError({ message: 'x', statusCode: 409, errorCode: 'external_id_conflict' });
+    expect(err).toBeInstanceOf(ExternalIdConflictError);
+  });
+
+  it('maps 422 content_validation_failed (single problem)', () => {
+    const detail = { json_path: '$.title', message: 'required' };
+    const err = buildAPIError({
+      message: 'x',
+      statusCode: 422,
+      errorCode: 'content_validation_failed',
+      detail,
+    }) as ContentValidationFailedError;
+    expect(err).toBeInstanceOf(ContentValidationFailedError);
+    expect(err.errors).toEqual([detail]);
+    expect(err.errorsTruncated).toBe(false);
+  });
+
+  it('maps 422 content_validation_failed (multiple, truncated)', () => {
+    const detail = {
+      json_path: 'multiple',
+      errors: [{ json_path: '$.a' }, { json_path: '$.b' }],
+      errors_truncated: true,
+    };
+    const err = buildAPIError({
+      message: 'x',
+      statusCode: 422,
+      errorCode: 'content_validation_failed',
+      detail,
+    }) as ContentValidationFailedError;
+    expect(err.errors).toHaveLength(2);
+    expect(err.errorsTruncated).toBe(true);
+  });
+
+  it('maps 502 upstream_error', () => {
+    const err = buildAPIError({ message: 'x', statusCode: 502, errorCode: 'upstream_error' });
+    expect(err).toBeInstanceOf(UpstreamError);
+  });
+
+  it('unknown status/code falls through to the base error', () => {
+    const err = buildAPIError({ message: 'x', statusCode: 418, errorCode: 'teapot' });
+    expect(err.constructor).toBe(FoxnoseAPIError);
   });
 });

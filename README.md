@@ -153,6 +153,11 @@ console.log(router.routes.length);
 const schema = await client.getSchema('articles');
 console.log(schema.searchable_fields);
 
+// Writes require a write-capable key. Create publishes immediately; `key` is an
+// optional external id used to deduplicate. updateResource is a full replace.
+const created = await client.createResource('articles', { title: 'Hello' }, { key: 'my-id' });
+await client.updateResource('articles', created.resource_key, { title: 'Hello (edited)' });
+
 client.close();
 ```
 
@@ -342,6 +347,37 @@ try {
   }
 }
 ```
+
+### Write errors
+
+Resource writes (`createResource` / `updateResource`) can throw these typed
+subclasses of `FoxnoseAPIError`:
+
+```typescript
+import {
+  CollectionNotWritableError,
+  ExternalIdConflictError,
+  ContentValidationFailedError,
+  UpstreamError,
+} from '@foxnose/sdk';
+
+try {
+  await client.createResource('articles', { title: 'Hi' }, { key: 'ext-1' });
+} catch (err) {
+  if (err instanceof ExternalIdConflictError) {
+    // HTTP 409 — a resource with that key already exists
+  } else if (err instanceof ContentValidationFailedError) {
+    // HTTP 422 — err.errors[] each carry a json_path; err.errorsTruncated
+    console.error(err.errors, err.errorsTruncated);
+  } else if (err instanceof CollectionNotWritableError) {
+    // HTTP 403 — this key cannot write to that collection
+  } else if (err instanceof UpstreamError) {
+    // HTTP 502 — outcome unknown; re-read with a GET before retrying
+  }
+}
+```
+
+Writes are never retried automatically (they are not idempotent).
 
 ## Batch Operations
 

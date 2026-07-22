@@ -503,11 +503,8 @@ export interface UsageMetric {
 
 export interface UsageBreakdown {
   projects: UsageMetric;
-  environments: UsageMetric;
-  folders: UsageMetric;
   resources: UsageMetric;
   users: UsageMetric;
-  components: UsageMetric;
 }
 
 export interface CurrentUsage {

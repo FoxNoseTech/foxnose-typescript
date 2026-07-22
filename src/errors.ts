@@ -145,6 +145,55 @@ export class RateLimitExceededError extends FoxnoseAPIError {
   }
 }
 
+/**
+ * Raised on HTTP 403 when the target collection does not accept writes (or the
+ * key in use lacks write access).
+ */
+export class CollectionNotWritableError extends FoxnoseAPIError {
+  constructor(options: APIErrorOptions) {
+    super(options);
+    this.name = 'CollectionNotWritableError';
+  }
+}
+
+/**
+ * Raised on HTTP 409 when the supplied `key` already identifies a resource.
+ */
+export class ExternalIdConflictError extends FoxnoseAPIError {
+  constructor(options: APIErrorOptions) {
+    super(options);
+    this.name = 'ExternalIdConflictError';
+  }
+}
+
+/**
+ * Raised on HTTP 422 when submitted `data` fails the collection's schema.
+ */
+export class ContentValidationFailedError extends FoxnoseAPIError {
+  /** Individual validation problems; each includes a `json_path`. */
+  readonly errors: unknown[];
+  /** True when the server capped a very large error list. */
+  readonly errorsTruncated: boolean;
+
+  constructor(options: APIErrorOptions & { errors?: unknown[]; errorsTruncated?: boolean }) {
+    super(options);
+    this.name = 'ContentValidationFailedError';
+    this.errors = options.errors ?? [];
+    this.errorsTruncated = options.errorsTruncated ?? false;
+  }
+}
+
+/**
+ * Raised on HTTP 502 when a write could not be confirmed. The write may or may
+ * not have been applied — re-read the resource with a GET before retrying.
+ */
+export class UpstreamError extends FoxnoseAPIError {
+  constructor(options: APIErrorOptions) {
+    super(options);
+    this.name = 'UpstreamError';
+  }
+}
+
 /** Returns true only for a plain (non-null, non-array) object. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -212,6 +261,32 @@ export function buildAPIError(options: APIErrorOptions): FoxnoseAPIError {
       ...options,
       retryAfter: Number.isNaN(parsed) ? undefined : parsed,
     });
+  }
+
+  if (statusCode === 403 && errorCode === 'collection_not_writable') {
+    return new CollectionNotWritableError(options);
+  }
+
+  if (statusCode === 409 && errorCode === 'external_id_conflict') {
+    return new ExternalIdConflictError(options);
+  }
+
+  if (statusCode === 422 && errorCode === 'content_validation_failed') {
+    const d = isPlainObject(detail) ? detail : {};
+    const errors = Array.isArray(d.errors)
+      ? d.errors
+      : typeof d.json_path === 'string'
+        ? [d]
+        : [];
+    return new ContentValidationFailedError({
+      ...options,
+      errors,
+      errorsTruncated: d.errors_truncated === true,
+    });
+  }
+
+  if (statusCode === 502 && errorCode === 'upstream_error') {
+    return new UpstreamError(options);
   }
 
   return new FoxnoseAPIError(options);
