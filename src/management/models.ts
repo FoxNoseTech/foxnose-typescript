@@ -388,6 +388,16 @@ export interface APIInfo {
   environment: string;
   version?: string | null;
   is_auth_required: boolean;
+  /** Whether the MCP endpoint (`/{prefix}/_mcp`) is exposed. Defaults to true. */
+  mcp_enabled?: boolean;
+  /** Whether router introspection (`/{prefix}/_router`) is exposed. Defaults to true. */
+  router_introspection_enabled?: boolean;
+  /**
+   * Allowed browser origins for cross-origin reads. Empty (the default) means
+   * CORS is off; `["*"]` allows any origin. Server-validated and normalized.
+   * Covers public read traffic only — writes still require a key.
+   */
+  cors_origins?: string[];
   created_at: string;
   path?: string | null;
 }

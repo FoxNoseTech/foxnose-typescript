@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ManagementClient } from '../../src/management/client.js';
+import type { APIInfo } from '../../src/management/models.js';
 import type { AuthStrategy, RequestData } from '../../src/auth/types.js';
 
 const dummyAuth: AuthStrategy = {
@@ -222,6 +223,78 @@ describe('ManagementClient', () => {
 
       globalThis.fetch = vi.fn(async () => new Response(null, { status: 204 }));
       await client.deleteApi('api-1');
+    });
+
+    it('parses the agent-feature and cors_origins fields on the response', async () => {
+      const api: APIInfo = {
+        key: 'api-1',
+        name: 'Test API',
+        prefix: 'shop',
+        environment: 'env-123',
+        is_auth_required: false,
+        mcp_enabled: false,
+        router_introspection_enabled: true,
+        cors_origins: ['https://app.example.com', 'https://admin.example.com'],
+        created_at: '2026-07-23T00:00:00Z',
+      };
+      setupMockFetch(api);
+      const client = createClient();
+      const result = await client.getApi('api-1');
+      expect(result.mcp_enabled).toBe(false);
+      expect(result.router_introspection_enabled).toBe(true);
+      expect(result.cors_origins).toEqual([
+        'https://app.example.com',
+        'https://admin.example.com',
+      ]);
+    });
+
+    it('tolerates unknown fields on the response (forward-compat with newer servers)', async () => {
+      const api = {
+        key: 'api-1',
+        name: 'Test API',
+        prefix: 'shop',
+        environment: 'env-123',
+        is_auth_required: false,
+        cors_origins: ['*'],
+        created_at: '2026-07-23T00:00:00Z',
+        // A field this SDK version does not know about yet:
+        some_future_flag: true,
+      };
+      setupMockFetch(api);
+      const client = createClient();
+      const result = await client.getApi('api-1');
+      expect(result.cors_origins).toEqual(['*']);
+      // Responses are returned as-is (raw JSON transport), so unknown fields
+      // are preserved, not stripped — and must never break parsing.
+      expect((result as Record<string, unknown>).some_future_flag).toBe(true);
+    });
+
+    it('passes cors_origins through create/update unchanged', async () => {
+      const fetchMock = setupMockFetch({ key: 'api-1' });
+      const client = createClient();
+
+      await client.createApi({
+        name: 'Test API',
+        prefix: 'shop',
+        is_auth_required: false,
+        mcp_enabled: false,
+        router_introspection_enabled: false,
+        cors_origins: ['*'],
+      });
+      const createBody = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+      expect(createBody.cors_origins).toEqual(['*']);
+      expect(createBody.mcp_enabled).toBe(false);
+      expect(createBody.router_introspection_enabled).toBe(false);
+
+      await client.updateApi('api-1', {
+        cors_origins: ['https://app.example.com'],
+        mcp_enabled: false,
+        router_introspection_enabled: true,
+      });
+      const updateBody = JSON.parse(fetchMock.mock.calls[1][1]?.body as string);
+      expect(updateBody.cors_origins).toEqual(['https://app.example.com']);
+      expect(updateBody.mcp_enabled).toBe(false);
+      expect(updateBody.router_introspection_enabled).toBe(true);
     });
   });
 

@@ -52,6 +52,15 @@ const client = new ManagementClient({
 const collections = await client.listCollections();
 console.log(collections.results);
 
+// Create a public API
+const api = await client.createApi({
+  name: 'Storefront',
+  prefix: 'shop',
+  is_auth_required: false,
+  cors_origins: ['*'], // browser CORS for public APIs (reads only)
+});
+console.log(api.key);
+
 // Create a resource
 const resource = await client.createResource('my-collection-key', {
   data: { title: 'Hello World' },
