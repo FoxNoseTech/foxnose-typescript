@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `APIInfo` now types three previously-undocumented fields on the Management API
+  "API" object, all optional for forward/backward compatibility with older
+  servers:
+  - `mcp_enabled?: boolean` — whether the MCP endpoint is exposed (default true)
+  - `router_introspection_enabled?: boolean` — whether router introspection is
+    exposed (default true)
+  - `cors_origins?: string[]` — allowed browser origins for cross-origin reads
+    (empty = off, `["*"]` = any origin); server-validated and normalized. Covers
+    public read traffic only — writes still require a key.
+  Setting these via `createApi` / `updateApi` already worked (the payload is
+  passed through); this only adds the types.
+
 ## [0.5.0] - 2026-07-22
 
 ### Added
