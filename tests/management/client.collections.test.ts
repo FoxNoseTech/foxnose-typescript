@@ -148,6 +148,27 @@ describe('ManagementClient — Collection methods', () => {
     expect(body.description_schema).toBe('schema');
   });
 
+  it('addApiCollection sends unscoped_levels / unscoped_ancestors when given', async () => {
+    const fetchMock = setupMockFetch({ folder: 'c1', api: 'my-api' });
+    const client = createClient();
+    await client.addApiCollection('my-api', 'c1', {
+      unscopedLevels: [0],
+      unscopedAncestors: ['01debe0d-0325-42b1-9bfd-ef52046cd785'],
+    });
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.unscoped_levels).toEqual([0]);
+    expect(body.unscoped_ancestors).toEqual(['01debe0d-0325-42b1-9bfd-ef52046cd785']);
+  });
+
+  it('addApiCollection omits unscoped_levels / unscoped_ancestors when not given', async () => {
+    const fetchMock = setupMockFetch({ folder: 'c1', api: 'my-api' });
+    const client = createClient();
+    await client.addApiCollection('my-api', 'c1', { allowedMethods: ['get_one'] });
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect('unscoped_levels' in body).toBe(false);
+    expect('unscoped_ancestors' in body).toBe(false);
+  });
+
   it('listApiCollections hits the /api/{api}/collections/ subroute', async () => {
     const fetchMock = setupMockFetch({ count: 0, results: [] });
     const client = createClient();
@@ -221,6 +242,73 @@ describe('ManagementClient — Collection methods', () => {
     expect(body.description_get_many).toBe('many');
     expect(body.description_search).toBe('search');
     expect(body.description_schema).toBe('schema');
+  });
+
+  it('updateApiCollection sends unscoped_levels / unscoped_ancestors when given', async () => {
+    const fetchMock = setupMockFetch({ folder: 'c1', api: 'my-api' });
+    const client = createClient();
+    await client.updateApiCollection('my-api', 'c1', {
+      unscopedLevels: [0, 1],
+      unscopedAncestors: [
+        '01debe0d-0325-42b1-9bfd-ef52046cd785',
+        '432880c9-ae43-4462-b4f3-f16c18068ea5',
+      ],
+    });
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.unscoped_levels).toEqual([0, 1]);
+    expect(body.unscoped_ancestors).toEqual([
+      '01debe0d-0325-42b1-9bfd-ef52046cd785',
+      '432880c9-ae43-4462-b4f3-f16c18068ea5',
+    ]);
+  });
+
+  it('updateApiCollection omits unscoped_levels / unscoped_ancestors when not given', async () => {
+    const fetchMock = setupMockFetch({ folder: 'c1', api: 'my-api' });
+    const client = createClient();
+    await client.updateApiCollection('my-api', 'c1', { allowedMethods: ['get_one'] });
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect('unscoped_levels' in body).toBe(false);
+    expect('unscoped_ancestors' in body).toBe(false);
+  });
+
+  it('preserves flat_routes / expose_owner / flat_route through a mocked response', async () => {
+    const connection = {
+      folder: 'c1',
+      api: 'my-api',
+      unscoped_levels: [0],
+      unscoped_ancestors: ['01debe0d-0325-42b1-9bfd-ef52046cd785'],
+      expose_owner: false,
+      flat_route: {
+        path: '/realty/accounts/listings/photos',
+        omitted_ancestors: ['01debe0d-0325-42b1-9bfd-ef52046cd785'],
+        enabled: true,
+        read_methods: ['get_one', 'get_many'],
+        available: true,
+        unavailable_reason: null,
+        published_generation: 18,
+        router_generation: 18,
+      },
+      flat_routes: [
+        {
+          level: 0,
+          path: '/realty/accounts/listings/photos',
+          omitted_ancestors: ['01debe0d-0325-42b1-9bfd-ef52046cd785'],
+          retained_ancestors: [],
+          enabled: true,
+          read_methods: ['get_one', 'get_many'],
+          available: true,
+          unavailable_reason: null,
+          published_generation: 18,
+          router_generation: 18,
+        },
+      ],
+    };
+    setupMockFetch(connection);
+    const client = createClient();
+    const result = await client.getApiCollection('my-api', 'c1');
+    // TypeScript has no runtime parsing — this is a pass-through check, not a
+    // parsing test: the client returns exactly what the server sent.
+    expect(result).toEqual(connection);
   });
 
   // ----- canonical Collection schema versions -----
@@ -373,7 +461,12 @@ describe('ManagementClient — Collection methods', () => {
     expect(x.key).toBe('c1');
     const list: CollectionList = { count: 1, results: [x], next: null, previous: null };
     expect(list.results[0]).toBe(x);
-    const api: APICollectionSummary = { folder: 'c1' };
+    const api: APICollectionSummary = {
+      folder: 'c1',
+      unscoped_levels: [],
+      unscoped_ancestors: [],
+      expose_owner: false,
+    };
     expect(api.folder).toBe('c1');
     const apiList: APICollectionList = {
       count: 1,
@@ -425,6 +518,32 @@ describe('ManagementClient — Folder deprecation aliases', () => {
     await client.addApiFolder('my-api', 'c1', { allowedMethods: ['get_one'] });
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain('addApiFolder');
+  });
+
+  it('addApiFolder (deprecated) still forwards unscoped_levels / unscoped_ancestors', async () => {
+    const fetchMock = setupMockFetch({ folder: 'c1' });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const client = createClient();
+    await client.addApiFolder('my-api', 'c1', {
+      unscopedLevels: [0],
+      unscopedAncestors: ['01debe0d-0325-42b1-9bfd-ef52046cd785'],
+    });
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.unscoped_levels).toEqual([0]);
+    expect(body.unscoped_ancestors).toEqual(['01debe0d-0325-42b1-9bfd-ef52046cd785']);
+  });
+
+  it('updateApiFolder (deprecated) still forwards unscoped_levels / unscoped_ancestors', async () => {
+    const fetchMock = setupMockFetch({ folder: 'c1' });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const client = createClient();
+    await client.updateApiFolder('my-api', 'c1', {
+      unscopedLevels: [0],
+      unscopedAncestors: ['01debe0d-0325-42b1-9bfd-ef52046cd785'],
+    });
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.unscoped_levels).toEqual([0]);
+    expect(body.unscoped_ancestors).toEqual(['01debe0d-0325-42b1-9bfd-ef52046cd785']);
   });
 
   it('getApiFolder warns and hits the legacy /api/{api}/folders/ URL', async () => {

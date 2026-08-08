@@ -102,6 +102,8 @@ export type {
   APIFolderList,
   APICollectionSummary,
   APICollectionList,
+  FlatRoute,
+  FlatRouteSummary,
   OrganizationOwner,
   OrganizationSummary,
   OrganizationList,

@@ -86,6 +86,18 @@ export interface ApiFolderRouteDescriptionOptions {
 
 export interface ApiFolderOptions extends ApiFolderRouteDescriptionOptions {
   allowedMethods?: string[];
+  /**
+   * Ancestor levels (0 = fully flat) to expose as cross-parent read
+   * addresses. Wire field `unscoped_levels`. Must be sent together with
+   * `unscopedAncestors` — the server rejects a level with no corresponding
+   * ancestor; not enforced client-side.
+   */
+  unscopedLevels?: number[];
+  /**
+   * Ancestor UUIDs (not collection keys) to leave unscoped at the
+   * corresponding `unscopedLevels`. Wire field `unscoped_ancestors`.
+   */
+  unscopedAncestors?: string[];
 }
 
 /**
@@ -314,6 +326,41 @@ export class ManagementClient {
     await this.request('DELETE', `${this.paths.apiRoot(key)}/`, { parseJson: false });
   }
 
+  /**
+   * Build the request body shared by all four API-collection-association
+   * writers: {@link addApiCollection}, {@link updateApiCollection}, and
+   * their deprecated `*ApiFolder*` twins. All four accept {@link
+   * ApiFolderOptions}, so this is the one place that maps its camelCase
+   * fields to wire snake_case — adding a field here, rather than to each
+   * method separately, is what keeps the deprecated twins from silently
+   * swallowing a field the type says they accept.
+   */
+  private buildApiFolderPayload(options?: ApiFolderOptions): Record<string, any> {
+    const body: Record<string, any> = {};
+    if (options?.allowedMethods !== undefined) {
+      body.allowed_methods = options.allowedMethods;
+    }
+    if (options?.descriptionGetOne !== undefined) {
+      body.description_get_one = options.descriptionGetOne;
+    }
+    if (options?.descriptionGetMany !== undefined) {
+      body.description_get_many = options.descriptionGetMany;
+    }
+    if (options?.descriptionSearch !== undefined) {
+      body.description_search = options.descriptionSearch;
+    }
+    if (options?.descriptionSchema !== undefined) {
+      body.description_schema = options.descriptionSchema;
+    }
+    if (options?.unscopedLevels !== undefined) {
+      body.unscoped_levels = options.unscopedLevels;
+    }
+    if (options?.unscopedAncestors !== undefined) {
+      body.unscoped_ancestors = options.unscopedAncestors;
+    }
+    return body;
+  }
+
   // ------------------------------------------------------------------ //
   // API ↔ Collection association (canonical)
   // ------------------------------------------------------------------ //
@@ -334,22 +381,7 @@ export class ManagementClient {
     const aKey = resolveKey(apiKey);
     const cKey = resolveKey(collectionKey);
     // Wire field name `folder` is preserved for backwards compat.
-    const body: Record<string, any> = { folder: cKey };
-    if (options?.allowedMethods !== undefined) {
-      body.allowed_methods = options.allowedMethods;
-    }
-    if (options?.descriptionGetOne !== undefined) {
-      body.description_get_one = options.descriptionGetOne;
-    }
-    if (options?.descriptionGetMany !== undefined) {
-      body.description_get_many = options.descriptionGetMany;
-    }
-    if (options?.descriptionSearch !== undefined) {
-      body.description_search = options.descriptionSearch;
-    }
-    if (options?.descriptionSchema !== undefined) {
-      body.description_schema = options.descriptionSchema;
-    }
+    const body: Record<string, any> = { folder: cKey, ...this.buildApiFolderPayload(options) };
     return this.request('POST', `${this.paths.apiCollectionsRoot(aKey)}/`, {
       jsonBody: body,
     });
@@ -371,22 +403,7 @@ export class ManagementClient {
   ): Promise<APICollectionSummary> {
     const aKey = resolveKey(apiKey);
     const cKey = resolveKey(collectionKey);
-    const body: Record<string, any> = {};
-    if (options?.allowedMethods !== undefined) {
-      body.allowed_methods = options.allowedMethods;
-    }
-    if (options?.descriptionGetOne !== undefined) {
-      body.description_get_one = options.descriptionGetOne;
-    }
-    if (options?.descriptionGetMany !== undefined) {
-      body.description_get_many = options.descriptionGetMany;
-    }
-    if (options?.descriptionSearch !== undefined) {
-      body.description_search = options.descriptionSearch;
-    }
-    if (options?.descriptionSchema !== undefined) {
-      body.description_schema = options.descriptionSchema;
-    }
+    const body = this.buildApiFolderPayload(options);
     return this.request('PUT', `${this.paths.apiCollectionsRoot(aKey)}/${cKey}/`, {
       jsonBody: body,
     });
@@ -425,22 +442,7 @@ export class ManagementClient {
     warnDeprecatedMethod('addApiFolder', 'addApiCollection');
     const aKey = resolveKey(apiKey);
     const fKey = resolveKey(folderKey);
-    const body: Record<string, any> = { folder: fKey };
-    if (options?.allowedMethods !== undefined) {
-      body.allowed_methods = options.allowedMethods;
-    }
-    if (options?.descriptionGetOne !== undefined) {
-      body.description_get_one = options.descriptionGetOne;
-    }
-    if (options?.descriptionGetMany !== undefined) {
-      body.description_get_many = options.descriptionGetMany;
-    }
-    if (options?.descriptionSearch !== undefined) {
-      body.description_search = options.descriptionSearch;
-    }
-    if (options?.descriptionSchema !== undefined) {
-      body.description_schema = options.descriptionSchema;
-    }
+    const body: Record<string, any> = { folder: fKey, ...this.buildApiFolderPayload(options) };
     return this.request('POST', `${this.paths.apiFoldersRoot(aKey)}/`, { jsonBody: body });
   }
 
@@ -461,22 +463,7 @@ export class ManagementClient {
     warnDeprecatedMethod('updateApiFolder', 'updateApiCollection');
     const aKey = resolveKey(apiKey);
     const fKey = resolveKey(folderKey);
-    const body: Record<string, any> = {};
-    if (options?.allowedMethods !== undefined) {
-      body.allowed_methods = options.allowedMethods;
-    }
-    if (options?.descriptionGetOne !== undefined) {
-      body.description_get_one = options.descriptionGetOne;
-    }
-    if (options?.descriptionGetMany !== undefined) {
-      body.description_get_many = options.descriptionGetMany;
-    }
-    if (options?.descriptionSearch !== undefined) {
-      body.description_search = options.descriptionSearch;
-    }
-    if (options?.descriptionSchema !== undefined) {
-      body.description_schema = options.descriptionSchema;
-    }
+    const body = this.buildApiFolderPayload(options);
     return this.request('PUT', `${this.paths.apiFoldersRoot(aKey)}/${fKey}/`, {
       jsonBody: body,
     });

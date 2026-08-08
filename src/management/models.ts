@@ -404,6 +404,51 @@ export interface APIInfo {
 
 export type APIList = PaginatedResponse<APIInfo>;
 
+/**
+ * One entry in `flat_routes[]` on a collection's connection to an API — a
+ * read-only address for a strict-reference collection that omits some
+ * number of ancestor keys from the path. `level 0` is fully flat and drops
+ * every ancestor key; `level >= 1` keeps the root-most `retained_ancestors`.
+ *
+ * `omitted_ancestors` and `retained_ancestors` are ancestor UUIDs, not the
+ * short collection keys used elsewhere (e.g. `folder`) — do not treat them
+ * as interchangeable.
+ *
+ * `read_methods` is typed as sent by the server, which currently mirrors
+ * the connection's `allowed_methods` verbatim rather than filtering by what
+ * is actually available at this level (docs and server disagree on both
+ * Get Resource at level 0 and Search at any level). Do not "correct" it.
+ */
+export interface FlatRoute {
+  level: number;
+  path: string;
+  omitted_ancestors: string[];
+  retained_ancestors: string[];
+  enabled: boolean;
+  read_methods: string[];
+  available: boolean;
+  unavailable_reason: string | null;
+  published_generation: number;
+  router_generation: number;
+}
+
+/**
+ * The singular `flat_route` on a connection. Undocumented: it appears to
+ * mirror whichever entry of `flat_routes` is enabled, but unlike a
+ * {@link FlatRoute} it carries no `level` or `retained_ancestors`. Type it
+ * for forward compatibility; build no behavior on it.
+ */
+export interface FlatRouteSummary {
+  path: string;
+  omitted_ancestors: string[];
+  enabled: boolean;
+  read_methods: string[];
+  available: boolean;
+  unavailable_reason: string | null;
+  published_generation: number;
+  router_generation: number;
+}
+
 export interface APIFolderSummary {
   folder: string;
   api?: string | null;
@@ -414,6 +459,29 @@ export interface APIFolderSummary {
   description_search?: string | null;
   description_schema?: string | null;
   created_at?: string | null;
+  /**
+   * Ancestor levels (0 = fully flat) exposed as cross-parent read addresses
+   * for this connection. Sent together with `unscoped_ancestors` — a level
+   * with no corresponding ancestor is rejected by the server. Present on
+   * every connection observed (`[]` when unused), not nullable.
+   */
+  unscoped_levels: number[];
+  /**
+   * Ancestor UUIDs (not collection keys) left unscoped at the corresponding
+   * `unscoped_levels`. Present on every connection observed (`[]` when
+   * unused), not nullable.
+   */
+  unscoped_ancestors: string[];
+  /**
+   * Present in the response but documented nowhere; semantics unconfirmed.
+   * Typed so it is no longer silently dropped. Do not build request-side
+   * behavior on it.
+   */
+  expose_owner: boolean;
+  /** Undocumented; see {@link FlatRouteSummary}. Observed `null`, not just absent. */
+  flat_route?: FlatRouteSummary | null;
+  /** Observed `null` (not `[]`) on a connection with no key-bearing ancestor. */
+  flat_routes?: FlatRoute[] | null;
 }
 
 export type APIFolderList = PaginatedResponse<APIFolderSummary>;
