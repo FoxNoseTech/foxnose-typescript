@@ -136,6 +136,17 @@ describe('FluxClient', () => {
       expect(init?.method).toBe('POST');
       expect(JSON.parse(init?.body as string)).toEqual(body);
     });
+
+    it('forwards options.params to the query string, not the body', async () => {
+      const fetchMock = setupMockFetch({ results: [] });
+      const client = createClient();
+      const body = { find_text: { query: 'hello' } };
+      await client.search('articles', body, { params: { truncate_text: 50 } });
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://env-123.fxns.io/v1/articles/_search?truncate_text=50');
+      expect(JSON.parse(init?.body as string)).toEqual(body);
+    });
   });
 
   describe('introspection', () => {
@@ -213,6 +224,31 @@ describe('FluxClient', () => {
       expect(body.sort).toBe('-score');
       expect(body.where).toEqual({ category: 'tech' });
     });
+
+    it('forwards queryParams to the query string, not the body', async () => {
+      const fetchMock = setupMockFetch({ results: [] });
+      const client = createClient();
+      await client.vectorSearch('articles', {
+        query: 'hello',
+        queryParams: { truncate_text: 50 },
+      });
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://env-123.fxns.io/v1/articles/_search?truncate_text=50');
+      const body = JSON.parse(init?.body as string);
+      expect(body.queryParams).toBeUndefined();
+    });
+
+    it('regression: an extra body field named "params" still lands in the body', async () => {
+      const fetchMock = setupMockFetch({ results: [] });
+      const client = createClient();
+      await client.vectorSearch('articles', { query: 'hello', params: { foo: 'bar' } });
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://env-123.fxns.io/v1/articles/_search');
+      const body = JSON.parse(init?.body as string);
+      expect(body.params).toEqual({ foo: 'bar' });
+    });
   });
 
   describe('vectorFieldSearch', () => {
@@ -230,6 +266,21 @@ describe('FluxClient', () => {
       expect(body.vector_field_search.field).toBe('speaker_embedding');
       expect(body.vector_field_search.query_vector).toEqual([0.1, 0.2, 0.3]);
       expect(body.vector_field_search.similarity_threshold).toBe(0.8);
+    });
+
+    it('forwards queryParams to the query string, not the body', async () => {
+      const fetchMock = setupMockFetch({ results: [] });
+      const client = createClient();
+      await client.vectorFieldSearch('articles', {
+        field: 'speaker_embedding',
+        query_vector: [0.1, 0.2, 0.3],
+        queryParams: { truncate_text: 50 },
+      });
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://env-123.fxns.io/v1/articles/_search?truncate_text=50');
+      const body = JSON.parse(init?.body as string);
+      expect(body.queryParams).toBeUndefined();
     });
   });
 
@@ -250,6 +301,21 @@ describe('FluxClient', () => {
       expect(body.vector_search.query).toBe('semantic query');
       expect(body.hybrid_config.vector_weight).toBe(0.7);
       expect(body.hybrid_config.text_weight).toBe(0.3);
+    });
+
+    it('forwards queryParams to the query string, not the body', async () => {
+      const fetchMock = setupMockFetch({ results: [] });
+      const client = createClient();
+      await client.hybridSearch('articles', {
+        query: 'semantic query',
+        find_text: { query: 'keyword' },
+        queryParams: { truncate_text: 50 },
+      });
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://env-123.fxns.io/v1/articles/_search?truncate_text=50');
+      const body = JSON.parse(init?.body as string);
+      expect(body.queryParams).toBeUndefined();
     });
   });
 
@@ -283,6 +349,21 @@ describe('FluxClient', () => {
       const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
       expect(body.vector_field_search.field).toBe('emb');
       expect(body.vector_search).toBeUndefined();
+    });
+
+    it('forwards queryParams to the query string, not the body', async () => {
+      const fetchMock = setupMockFetch({ results: [] });
+      const client = createClient();
+      await client.boostedSearch('articles', {
+        find_text: { query: 'keyword' },
+        query: 'semantic boost',
+        queryParams: { truncate_text: 50 },
+      });
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://env-123.fxns.io/v1/articles/_search?truncate_text=50');
+      const body = JSON.parse(init?.body as string);
+      expect(body.queryParams).toBeUndefined();
     });
 
     it('rejects both query and field+vector', async () => {
@@ -715,5 +796,109 @@ describe('mergeExtra', () => {
   it('merges non-conflicting keys', () => {
     const result = mergeExtra({ search_mode: 'vector' }, { where: { x: 1 } });
     expect(result).toEqual({ search_mode: 'vector', where: { x: 1 } });
+  });
+
+  it('rejects truncate_text as a body extra, naming queryParams', () => {
+    expect(() => mergeExtra({ search_mode: 'vector' }, { truncate_text: 50 })).toThrow(
+      'queryParams',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-parent address path construction — regression pins.
+//
+// These pin how the SDK builds the URL for an opaque nested collection path
+// (fully-flat, e.g. `realty/accounts/listings/photos`, and partially-flat,
+// e.g. `realty/accounts/acc_1/listings/photos`). They prove the SDK builds
+// the URL correctly, NOT that the server serves any particular read method
+// at that level — see the plan's "Do not paper over the read_methods
+// discrepancies" note.
+// ---------------------------------------------------------------------------
+
+describe('cross-parent address path construction (regression pins)', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('listResources builds a fully-flat cross-parent path', async () => {
+    const fetchMock = setupMockFetch({ results: [] });
+    const client = createClient();
+    await client.listResources('realty/accounts/listings/photos');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://env-123.fxns.io/v1/realty/accounts/listings/photos',
+    );
+  });
+
+  it('listResources builds a partially-flat cross-parent path', async () => {
+    const fetchMock = setupMockFetch({ results: [] });
+    const client = createClient();
+    await client.listResources('realty/accounts/acc_1/listings/photos');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://env-123.fxns.io/v1/realty/accounts/acc_1/listings/photos',
+    );
+  });
+
+  it('getResource builds a fully-flat cross-parent path', async () => {
+    const fetchMock = setupMockFetch({});
+    const client = createClient();
+    await client.getResource('realty/accounts/listings/photos', 'photo_1');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://env-123.fxns.io/v1/realty/accounts/listings/photos/photo_1',
+    );
+  });
+
+  it('getResource builds a partially-flat cross-parent path', async () => {
+    const fetchMock = setupMockFetch({});
+    const client = createClient();
+    await client.getResource('realty/accounts/acc_1/listings/photos', 'photo_1');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://env-123.fxns.io/v1/realty/accounts/acc_1/listings/photos/photo_1',
+    );
+  });
+
+  it('search builds a fully-flat cross-parent path', async () => {
+    const fetchMock = setupMockFetch({ results: [] });
+    const client = createClient();
+    await client.search('realty/accounts/listings/photos', { find_text: { query: 'x' } });
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://env-123.fxns.io/v1/realty/accounts/listings/photos/_search',
+    );
+  });
+
+  it('search builds a partially-flat cross-parent path', async () => {
+    const fetchMock = setupMockFetch({ results: [] });
+    const client = createClient();
+    await client.search('realty/accounts/acc_1/listings/photos', {
+      find_text: { query: 'x' },
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://env-123.fxns.io/v1/realty/accounts/acc_1/listings/photos/_search',
+    );
+  });
+
+  it('getSchema builds a fully-flat cross-parent path', async () => {
+    const fetchMock = setupMockFetch({});
+    const client = createClient();
+    await client.getSchema('realty/accounts/listings/photos');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://env-123.fxns.io/v1/realty/accounts/listings/photos/_schema',
+    );
+  });
+
+  it('getSchema builds a partially-flat cross-parent path', async () => {
+    const fetchMock = setupMockFetch({});
+    const client = createClient();
+    await client.getSchema('realty/accounts/acc_1/listings/photos');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://env-123.fxns.io/v1/realty/accounts/acc_1/listings/photos/_schema',
+    );
   });
 });

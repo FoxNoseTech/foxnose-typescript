@@ -216,6 +216,11 @@ export function mergeExtra(
   validated: Record<string, any>,
   extra: Record<string, any>,
 ): Record<string, any> {
+  if ('truncate_text' in extra) {
+    throw new Error(
+      "'truncate_text' is a query parameter, not a body field. Pass it via the 'queryParams' option instead.",
+    );
+  }
   const conflicts: string[] = [];
   for (const key of Object.keys(extra)) {
     if (SEARCH_REQUEST_KNOWN_KEYS.has(key)) {
