@@ -169,6 +169,30 @@ describe('ManagementClient — Collection methods', () => {
     expect('unscoped_ancestors' in body).toBe(false);
   });
 
+  // Regression pin: the API requires unscoped_levels and unscoped_ancestors
+  // to be sent together, but enforcing that pairing is the server's job, not
+  // the SDK's. Either field alone must still reach the request body -- if
+  // this starts throwing, client-side pairing validation has crept into the
+  // SDK.
+  it('addApiCollection forwards unscopedLevels or unscopedAncestors alone without requiring both', async () => {
+    const fetchMock = setupMockFetch({ folder: 'c1', api: 'my-api' });
+    const client = createClient();
+
+    await client.addApiCollection('my-api', 'c1', { unscopedLevels: [0] });
+    const levelsOnlyBody = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(levelsOnlyBody.unscoped_levels).toEqual([0]);
+    expect('unscoped_ancestors' in levelsOnlyBody).toBe(false);
+
+    await client.addApiCollection('my-api', 'c1', {
+      unscopedAncestors: ['01debe0d-0325-42b1-9bfd-ef52046cd785'],
+    });
+    const ancestorsOnlyBody = JSON.parse(fetchMock.mock.calls[1][1]?.body as string);
+    expect(ancestorsOnlyBody.unscoped_ancestors).toEqual([
+      '01debe0d-0325-42b1-9bfd-ef52046cd785',
+    ]);
+    expect('unscoped_levels' in ancestorsOnlyBody).toBe(false);
+  });
+
   it('listApiCollections hits the /api/{api}/collections/ subroute', async () => {
     const fetchMock = setupMockFetch({ count: 0, results: [] });
     const client = createClient();

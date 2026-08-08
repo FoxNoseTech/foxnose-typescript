@@ -147,6 +147,26 @@ describe('FluxClient', () => {
       expect(url).toBe('https://env-123.fxns.io/v1/articles/_search?truncate_text=50');
       expect(JSON.parse(init?.body as string)).toEqual(body);
     });
+
+    // Regression pin: truncate_text bounds (integer, >= 1) are validated by
+    // the server via a 422, not the SDK. An out-of-range value (0) and a
+    // non-integer value must keep forwarding to the query string unchanged
+    // -- not throw -- or client-side validation has crept into the SDK.
+    it('forwards out-of-range and non-integer truncate_text without throwing', async () => {
+      const fetchMock = setupMockFetch({ results: [] });
+      const client = createClient();
+      const body = { find_text: { query: 'hello' } };
+
+      await client.search('articles', body, { params: { truncate_text: 0 } });
+      expect(fetchMock.mock.calls[0][0]).toBe(
+        'https://env-123.fxns.io/v1/articles/_search?truncate_text=0',
+      );
+
+      await client.search('articles', body, { params: { truncate_text: 'not-an-integer' } });
+      expect(fetchMock.mock.calls[1][0]).toBe(
+        'https://env-123.fxns.io/v1/articles/_search?truncate_text=not-an-integer',
+      );
+    });
   });
 
   describe('introspection', () => {

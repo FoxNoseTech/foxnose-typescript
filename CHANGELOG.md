@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0] - 2026-08-08
 
 ### Added
 
@@ -31,6 +31,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one payload serializer — accept `unscopedLevels` / `unscopedAncestors` to
   configure cross-parent read addresses. Not validated client-side: the server
   rejects a level with no corresponding ancestor.
+
+### Changed
+
+- **Potentially breaking for source that builds `APIFolderSummary` /
+  `APICollectionSummary` as an object literal**: `unscoped_levels`,
+  `unscoped_ancestors`, and `expose_owner` are now required fields on these
+  types (matching the server, which always sends them), not optional. Code
+  that constructs one of these objects by hand — e.g. in a test fixture or
+  mock — will fail to compile until it supplies the three fields; values
+  received from the API and merely read are unaffected. The Python SDK is
+  not affected: its equivalent fields carry defaults.
 
 ### Fixed
 
