@@ -170,6 +170,73 @@ await client.updateResource('articles', created.resource_key, { title: 'Hello (e
 client.close();
 ```
 
+### Truncating long text fields
+
+`truncate_text` is a query parameter on List Resources and Search that caps
+every `text`-typed field to a maximum length. It is off by default, ignored
+when `raw=true`, and the SDK does not validate it client-side — a value below
+1 or a non-integer surfaces as a server `422 validation_error`.
+
+```typescript
+// List Resources: truncate_text is a plain query param
+const page = await client.listResources('articles', { truncate_text: 200 });
+
+// Search: pass it via the third `options.params` argument, not the body
+const results = await client.search(
+  'articles',
+  { find_text: { query: 'machine learning' } },
+  { params: { truncate_text: 200 } },
+);
+
+// Truncated fields are reported per-resource under `_sys.truncated`; fields
+// within the limit get no entry. `locale` is null for non-localized fields.
+console.log(page.results[0]._sys.truncated);
+// [{ field: 'body', locale: null, original_length: 850 }]
+```
+
+`next` is a full absolute URL and preserves `truncate_text` across pages.
+The SDK does not follow `next` automatically — `buildUrl` always resolves
+paths against the configured `baseUrl`, so a server-returned absolute URL
+cannot be fed back in directly. Extract the cursor yourself:
+
+```typescript
+const cursor = page.next ? new URL(page.next).searchParams.get('next') : null;
+if (cursor) {
+  const nextPage = await client.listResources('articles', {
+    truncate_text: 200,
+    next: cursor,
+  });
+}
+```
+
+### Cross-parent addressing
+
+A strict-reference collection can be reached at additional, read-only
+addresses that omit some number of ancestor keys from the path — fully-flat
+(drops every ancestor key) or partially-flat (keeps the root-most ancestor
+keys). `folderPath` is always an opaque string that the SDK slash-trims and
+interpolates without parsing, so any address the API exposes works unchanged
+with `listResources`, `getResource`, `search`, and `getSchema`:
+
+```typescript
+// Standard nested path
+await client.listResources('realty/accounts/acc_1/listings/lst_1/photos');
+
+// Partially-flat: keeps the root-most ancestor key
+await client.listResources('realty/accounts/acc_1/listings/photos');
+
+// Fully-flat: drops every ancestor key
+await client.listResources('realty/accounts/listings/photos');
+```
+
+These addresses are read-only; the server rejects writes on a flat path.
+Before relying on a given address, check `enabled`, `available`, and
+`read_methods` on the connection's `flat_routes` (see
+`ManagementClient.getApiCollection`) rather than assuming every read method
+is available at every level — the API has known discrepancies here (Get
+Resource reported at level 0; Search absent from `read_methods` at every
+level) that the SDK types as sent, without correcting.
+
 ### Vector Search
 
 The Flux client provides typed convenience methods for all vector search modes:
@@ -212,6 +279,14 @@ const results = await client.vectorSearch('articles', {
   limit: 5,
   sort: '-published_at',
   where: { category: 'science' },
+});
+
+// queryParams forwards to the query string of the underlying search() call —
+// it is named queryParams, not params, because unknown keys on this options
+// object are otherwise merged into the JSON body.
+const truncated = await client.vectorSearch('articles', {
+  query: 'climate change',
+  queryParams: { truncate_text: 200 },
 });
 ```
 
