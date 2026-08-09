@@ -507,7 +507,20 @@ pnpm typecheck
 
 # Format
 pnpm format
+
+# Check formatting without rewriting (this is what CI runs)
+pnpm format:check
 ```
+
+### Checks before pushing
+
+CI gates on `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test:coverage` and `pnpm build`. To run the same checks locally on every `git push`, enable the repo's hook directory once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+`.githooks/pre-push` then runs lint, format, typecheck and tests, and aborts the push if any fail. It is opt-in per clone and can be skipped with `git push --no-verify`, so it is a fast feedback loop rather than a guarantee — CI remains the real gate.
 
 ## License
 

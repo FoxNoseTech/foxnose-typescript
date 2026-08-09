@@ -21,8 +21,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      # Formatting was never gated, so it drifted across 13 files before anyone
+      # noticed. Cheap to check, tedious to fix in bulk.
+      - run: pnpm format:check
       - run: pnpm typecheck
       - run: pnpm test:coverage
+      # The emitted declarations are part of the published public API, so a
+      # change that type-checks but fails to build is not releasable.
+      - run: pnpm build
       - if: matrix.node-version == 20
         uses: codecov/codecov-action@v5
         with:
