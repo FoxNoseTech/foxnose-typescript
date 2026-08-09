@@ -182,9 +182,7 @@ export function nestedFieldMeta(opts: {
 }): NestedFieldMeta {
   if (opts.extra) {
     const reserved = ['component', 'component_version', 'auto_update'];
-    const collisions = reserved.filter((k) =>
-      Object.prototype.hasOwnProperty.call(opts.extra, k),
-    );
+    const collisions = reserved.filter((k) => Object.prototype.hasOwnProperty.call(opts.extra, k));
     if (collisions.length > 0) {
       throw new Error(
         `nestedFieldMeta: 'extra' must not include reserved keys: ${collisions.join(', ')}`,

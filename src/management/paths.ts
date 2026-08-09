@@ -60,8 +60,7 @@ export function managementPaths(environmentKey: string) {
     apisRoot: () => `/v1/${environmentKey}/api`,
     apiRoot: (apiKey: string) => `/v1/${environmentKey}/api/${apiKey}`,
     apiFoldersRoot: (apiKey: string) => `/v1/${environmentKey}/api/${apiKey}/folders`,
-    apiCollectionsRoot: (apiKey: string) =>
-      `/v1/${environmentKey}/api/${apiKey}/collections`,
+    apiCollectionsRoot: (apiKey: string) => `/v1/${environmentKey}/api/${apiKey}/collections`,
 
     // Management role paths
     managementRolesRoot: () => `/v1/${environmentKey}/permissions/management-api/roles`,

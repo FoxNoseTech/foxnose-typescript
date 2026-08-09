@@ -242,10 +242,7 @@ describe('ManagementClient', () => {
       const result = await client.getApi('api-1');
       expect(result.mcp_enabled).toBe(false);
       expect(result.router_introspection_enabled).toBe(true);
-      expect(result.cors_origins).toEqual([
-        'https://app.example.com',
-        'https://admin.example.com',
-      ]);
+      expect(result.cors_origins).toEqual(['https://app.example.com', 'https://admin.example.com']);
     });
 
     it('tolerates unknown fields on the response (forward-compat with newer servers)', async () => {
@@ -1043,7 +1040,6 @@ describe('ManagementClient', () => {
         }),
       ).rejects.toThrow();
     });
-
   });
 
   describe('Legacy component-option guards', () => {

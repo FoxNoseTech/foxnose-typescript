@@ -462,7 +462,12 @@ describe('FluxClient', () => {
   });
 
   describe('writes', () => {
-    const created = { resource_key: 'res_1', revision_key: 'rev_1', write_units: 1, published: true };
+    const created = {
+      resource_key: 'res_1',
+      revision_key: 'rev_1',
+      write_units: 1,
+      published: true,
+    };
 
     it('createResource POSTs to the collection root with a trailing slash', async () => {
       const fetchMock = setupMockFetch(created, 201);
@@ -499,7 +504,11 @@ describe('FluxClient', () => {
       const fetchMock = vi.fn(
         async () =>
           new Response(
-            JSON.stringify({ error_code: 'upstream_error', message: 'Upstream write failed', detail: null }),
+            JSON.stringify({
+              error_code: 'upstream_error',
+              message: 'Upstream write failed',
+              detail: null,
+            }),
             { status: 502 },
           ),
       );
@@ -511,9 +520,9 @@ describe('FluxClient', () => {
         auth: dummyAuth,
         retryConfig: { attempts: 3, backoffFactor: 0, statusCodes: [502], methods: ['GET', 'PUT'] },
       });
-      await expect(client.updateResource('articles', 'res_1', { title: 'x' })).rejects.toBeInstanceOf(
-        UpstreamError,
-      );
+      await expect(
+        client.updateResource('articles', 'res_1', { title: 'x' }),
+      ).rejects.toBeInstanceOf(UpstreamError);
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
@@ -526,7 +535,12 @@ describe('FluxClient', () => {
         baseUrl: 'https://env-123.fxns.io',
         apiPrefix: 'v1',
         auth: dummyAuth,
-        retryConfig: { attempts: 3, backoffFactor: 0, statusCodes: [502], methods: ['GET', 'PUT', 'POST'] },
+        retryConfig: {
+          attempts: 3,
+          backoffFactor: 0,
+          statusCodes: [502],
+          methods: ['GET', 'PUT', 'POST'],
+        },
       });
       await expect(client.createResource('articles', { title: 'Hi' })).rejects.toBeInstanceOf(
         FoxnoseTransportError,

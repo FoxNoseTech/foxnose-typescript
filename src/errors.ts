@@ -273,11 +273,7 @@ export function buildAPIError(options: APIErrorOptions): FoxnoseAPIError {
 
   if (statusCode === 422 && errorCode === 'content_validation_failed') {
     const d = isPlainObject(detail) ? detail : {};
-    const errors = Array.isArray(d.errors)
-      ? d.errors
-      : typeof d.json_path === 'string'
-        ? [d]
-        : [];
+    const errors = Array.isArray(d.errors) ? d.errors : typeof d.json_path === 'string' ? [d] : [];
     return new ContentValidationFailedError({
       ...options,
       errors,

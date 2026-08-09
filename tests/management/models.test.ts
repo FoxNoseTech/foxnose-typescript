@@ -40,9 +40,7 @@ describe('nestedFieldMeta', () => {
   });
 
   it('defaults auto_update to false', () => {
-    expect(
-      nestedFieldMeta({ component: 'cmp-abc', componentVersion: 'ver-xyz' }),
-    ).toEqual({
+    expect(nestedFieldMeta({ component: 'cmp-abc', componentVersion: 'ver-xyz' })).toEqual({
       component: 'cmp-abc',
       component_version: 'ver-xyz',
       auto_update: false,

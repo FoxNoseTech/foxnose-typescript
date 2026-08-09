@@ -187,9 +187,7 @@ describe('ManagementClient — Collection methods', () => {
       unscopedAncestors: ['01debe0d-0325-42b1-9bfd-ef52046cd785'],
     });
     const ancestorsOnlyBody = JSON.parse(fetchMock.mock.calls[1][1]?.body as string);
-    expect(ancestorsOnlyBody.unscoped_ancestors).toEqual([
-      '01debe0d-0325-42b1-9bfd-ef52046cd785',
-    ]);
+    expect(ancestorsOnlyBody.unscoped_ancestors).toEqual(['01debe0d-0325-42b1-9bfd-ef52046cd785']);
     expect('unscoped_levels' in ancestorsOnlyBody).toBe(false);
   });
 
@@ -371,9 +369,7 @@ describe('ManagementClient — Collection methods', () => {
     const fetchMock = setupMockFetch({ key: 'v1' });
     const client = createClient();
     await client.updateCollectionVersion('c1', 'v1', { name: 'renamed' });
-    expect(fetchMock.mock.calls[0][0]).toContain(
-      '/v1/env-123/collections/c1/model/versions/v1/',
-    );
+    expect(fetchMock.mock.calls[0][0]).toContain('/v1/env-123/collections/c1/model/versions/v1/');
     expect(fetchMock.mock.calls[0][1]?.method).toBe('PUT');
     const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
     expect(body.name).toBe('renamed');
@@ -384,9 +380,7 @@ describe('ManagementClient — Collection methods', () => {
     globalThis.fetch = fetchMock;
     const client = createClient();
     await client.deleteCollectionVersion('c1', 'v1');
-    expect(fetchMock.mock.calls[0][0]).toContain(
-      '/v1/env-123/collections/c1/model/versions/v1/',
-    );
+    expect(fetchMock.mock.calls[0][0]).toContain('/v1/env-123/collections/c1/model/versions/v1/');
     expect(fetchMock.mock.calls[0][1]?.method).toBe('DELETE');
   });
 
@@ -441,9 +435,7 @@ describe('ManagementClient — Collection methods', () => {
     const fetchMock = setupMockFetch({ key: 'v1' });
     const client = createClient();
     await client.updateComponentVersion('cmp1', 'v1', { name: 'renamed' });
-    expect(fetchMock.mock.calls[0][0]).toContain(
-      '/v1/env-123/components/cmp1/model/versions/v1/',
-    );
+    expect(fetchMock.mock.calls[0][0]).toContain('/v1/env-123/components/cmp1/model/versions/v1/');
     expect(fetchMock.mock.calls[0][1]?.method).toBe('PUT');
     const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
     expect(body.name).toBe('renamed');

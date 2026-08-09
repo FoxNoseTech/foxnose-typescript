@@ -409,17 +409,12 @@ export class ManagementClient {
     });
   }
 
-  async removeApiCollection(
-    apiKey: APIRef,
-    collectionKey: CollectionRef,
-  ): Promise<void> {
+  async removeApiCollection(apiKey: APIRef, collectionKey: CollectionRef): Promise<void> {
     const aKey = resolveKey(apiKey);
     const cKey = resolveKey(collectionKey);
-    await this.request(
-      'DELETE',
-      `${this.paths.apiCollectionsRoot(aKey)}/${cKey}/`,
-      { parseJson: false },
-    );
+    await this.request('DELETE', `${this.paths.apiCollectionsRoot(aKey)}/${cKey}/`, {
+      parseJson: false,
+    });
   }
 
   // ------------------------------------------------------------------ //
@@ -714,9 +709,7 @@ export class ManagementClient {
     });
   }
 
-  async listCollectionTree(
-    options?: { key?: string; mode?: string },
-  ): Promise<CollectionList> {
+  async listCollectionTree(options?: { key?: string; mode?: string }): Promise<CollectionList> {
     const params: Record<string, any> = {};
     if (options?.key) params.key = options.key;
     if (options?.mode) params.mode = options.mode;
@@ -789,13 +782,9 @@ export class ManagementClient {
     if (options?.includeSchema !== undefined) {
       params.include_schema = options.includeSchema;
     }
-    return this.request(
-      'GET',
-      `${this.paths.collectionVersionsBase(cKey)}/${vKey}/`,
-      {
-        params: Object.keys(params).length > 0 ? params : undefined,
-      },
-    );
+    return this.request('GET', `${this.paths.collectionVersionsBase(cKey)}/${vKey}/`, {
+      params: Object.keys(params).length > 0 ? params : undefined,
+    });
   }
 
   async updateCollectionVersion(
@@ -805,11 +794,9 @@ export class ManagementClient {
   ): Promise<SchemaVersionSummary> {
     const cKey = resolveKey(collectionKey);
     const vKey = resolveKey(versionKey);
-    return this.request(
-      'PUT',
-      `${this.paths.collectionVersionsBase(cKey)}/${vKey}/`,
-      { jsonBody: payload },
-    );
+    return this.request('PUT', `${this.paths.collectionVersionsBase(cKey)}/${vKey}/`, {
+      jsonBody: payload,
+    });
   }
 
   async deleteCollectionVersion(
@@ -818,11 +805,9 @@ export class ManagementClient {
   ): Promise<void> {
     const cKey = resolveKey(collectionKey);
     const vKey = resolveKey(versionKey);
-    await this.request(
-      'DELETE',
-      `${this.paths.collectionVersionsBase(cKey)}/${vKey}/`,
-      { parseJson: false },
-    );
+    await this.request('DELETE', `${this.paths.collectionVersionsBase(cKey)}/${vKey}/`, {
+      parseJson: false,
+    });
   }
 
   async publishCollectionVersion(
@@ -831,10 +816,7 @@ export class ManagementClient {
   ): Promise<SchemaVersionSummary> {
     const cKey = resolveKey(collectionKey);
     const vKey = resolveKey(versionKey);
-    return this.request(
-      'POST',
-      `${this.paths.collectionVersionsBase(cKey)}/${vKey}/publish/`,
-    );
+    return this.request('POST', `${this.paths.collectionVersionsBase(cKey)}/${vKey}/publish/`);
   }
 
   /**
@@ -909,11 +891,7 @@ export class ManagementClient {
     if (options.toVersions !== undefined) {
       body.to_versions = options.toVersions;
     }
-    return this.request(
-      'POST',
-      `${this.paths.collectionSyncComponent(cKey)}/`,
-      { jsonBody: body },
-    );
+    return this.request('POST', `${this.paths.collectionSyncComponent(cKey)}/`, { jsonBody: body });
   }
 
   // ------------------------------------------------------------------ //
@@ -927,11 +905,7 @@ export class ManagementClient {
   ): Promise<FieldList> {
     const cKey = resolveKey(collectionKey);
     const vKey = resolveKey(versionKey);
-    return this.request(
-      'GET',
-      `${this.paths.collectionSchemaTree(cKey, vKey)}/`,
-      { params },
-    );
+    return this.request('GET', `${this.paths.collectionSchemaTree(cKey, vKey)}/`, { params });
   }
 
   async createCollectionField(
@@ -941,11 +915,9 @@ export class ManagementClient {
   ): Promise<FieldSummary> {
     const cKey = resolveKey(collectionKey);
     const vKey = resolveKey(versionKey);
-    return this.request(
-      'POST',
-      `${this.paths.collectionSchemaTree(cKey, vKey)}/`,
-      { jsonBody: payload },
-    );
+    return this.request('POST', `${this.paths.collectionSchemaTree(cKey, vKey)}/`, {
+      jsonBody: payload,
+    });
   }
 
   async getCollectionField(
@@ -955,11 +927,9 @@ export class ManagementClient {
   ): Promise<FieldSummary> {
     const cKey = resolveKey(collectionKey);
     const vKey = resolveKey(versionKey);
-    return this.request(
-      'GET',
-      `${this.paths.collectionSchemaTree(cKey, vKey)}/field/`,
-      { params: { path: fieldPath } },
-    );
+    return this.request('GET', `${this.paths.collectionSchemaTree(cKey, vKey)}/field/`, {
+      params: { path: fieldPath },
+    });
   }
 
   async updateCollectionField(
@@ -970,11 +940,10 @@ export class ManagementClient {
   ): Promise<FieldSummary> {
     const cKey = resolveKey(collectionKey);
     const vKey = resolveKey(versionKey);
-    return this.request(
-      'PUT',
-      `${this.paths.collectionSchemaTree(cKey, vKey)}/field/`,
-      { params: { path: fieldPath }, jsonBody: payload },
-    );
+    return this.request('PUT', `${this.paths.collectionSchemaTree(cKey, vKey)}/field/`, {
+      params: { path: fieldPath },
+      jsonBody: payload,
+    });
   }
 
   async deleteCollectionField(
@@ -984,11 +953,10 @@ export class ManagementClient {
   ): Promise<void> {
     const cKey = resolveKey(collectionKey);
     const vKey = resolveKey(versionKey);
-    await this.request(
-      'DELETE',
-      `${this.paths.collectionSchemaTree(cKey, vKey)}/field/`,
-      { params: { path: fieldPath }, parseJson: false },
-    );
+    await this.request('DELETE', `${this.paths.collectionSchemaTree(cKey, vKey)}/field/`, {
+      params: { path: fieldPath },
+      parseJson: false,
+    });
   }
 
   // ------------------------------------------------------------------ //
