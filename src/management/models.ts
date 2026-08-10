@@ -333,9 +333,37 @@ export interface FluxAPIKeySummary {
   role?: string | null;
   environment: string;
   created_at: string;
+  /**
+   * First 12 characters of the key's bearer token (e.g. `fxk_A7fQ2mXe`), or
+   * null when none is issued. Enough to recognise a token in a config file or
+   * a log; never enough to use one — the token itself is returned only by
+   * {@link ManagementClient.issueFluxApiKeyBearerToken}, once.
+   */
+  bearer_token_prefix?: string | null;
+  /** When the current bearer token was issued, or null. */
+  bearer_token_issued_at?: string | null;
 }
 
 export type FluxAPIKeyList = PaginatedResponse<FluxAPIKeySummary>;
+
+/**
+ * The one-time response from issuing or re-issuing a Flux key's bearer token.
+ *
+ * A bearer token is an opaque credential bound to a Flux API key, for hosted
+ * MCP connectors that can only send `Authorization: Bearer <token>` and cannot
+ * choose a scheme. It identifies the key and nothing more: role, grants and
+ * per-collection permissions are the key's own.
+ */
+export interface FluxAPIKeyBearerToken {
+  /**
+   * The credential, e.g. `fxk_A7fQ2mXe...`. RETURNED ONLY HERE, ONLY ONCE —
+   * the service stores a hash, so a lost token is re-issued, not recovered.
+   */
+  bearer_token: string;
+  /** First 12 characters, also present on every subsequent key read. */
+  bearer_token_prefix: string;
+  bearer_token_issued_at: string;
+}
 
 // ---------------------------------------------------------------------------
 // Roles & Permissions

@@ -88,6 +88,7 @@ export type {
   LocaleList,
   ManagementAPIKeySummary,
   ManagementAPIKeyList,
+  FluxAPIKeyBearerToken,
   FluxAPIKeySummary,
   FluxAPIKeyList,
   ManagementRoleSummary,
