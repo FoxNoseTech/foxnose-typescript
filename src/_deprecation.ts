@@ -7,11 +7,7 @@
 
 const warned = new Set<string>();
 
-export function warnDeprecatedMethod(
-  oldName: string,
-  newName: string,
-  removal = '1.0',
-): void {
+export function warnDeprecatedMethod(oldName: string, newName: string, removal = '1.0'): void {
   if (warned.has(oldName)) {
     return;
   }

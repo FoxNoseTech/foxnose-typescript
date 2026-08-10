@@ -272,7 +272,11 @@ describe('buildAPIError', () => {
 
 describe('buildAPIError — write errors', () => {
   it('maps 403 collection_not_writable', () => {
-    const err = buildAPIError({ message: 'x', statusCode: 403, errorCode: 'collection_not_writable' });
+    const err = buildAPIError({
+      message: 'x',
+      statusCode: 403,
+      errorCode: 'collection_not_writable',
+    });
     expect(err).toBeInstanceOf(CollectionNotWritableError);
     expect(err).toBeInstanceOf(FoxnoseAPIError);
     expect(err.statusCode).toBe(403);

@@ -5,10 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { FolderSummary, ResourceSummary } from '../../src/management/models.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const modelsSrc = fs.readFileSync(
-  path.resolve(here, '../../src/management/models.ts'),
-  'utf-8',
-);
+const modelsSrc = fs.readFileSync(path.resolve(here, '../../src/management/models.ts'), 'utf-8');
 
 describe('SDK shape after composite removal — source regex', () => {
   it('FolderSummary does not declare folder_type', () => {

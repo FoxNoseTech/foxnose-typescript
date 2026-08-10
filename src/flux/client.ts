@@ -39,6 +39,14 @@ export interface VectorSearchOptions {
   similarity_threshold?: number;
   limit?: number;
   offset?: number;
+  /**
+   * Query-string parameters for the underlying `search()` call (e.g.
+   * `{ truncate_text: 200 }`). Named `queryParams`, not `params`: this
+   * options object also carries an index signature that funnels unknown
+   * keys into the JSON body, and an explicit `params` field would silently
+   * reroute an existing `params` body extra to the query string.
+   */
+  queryParams?: Record<string, any>;
   [extra: string]: any;
 }
 
@@ -49,6 +57,8 @@ export interface VectorFieldSearchOptions {
   similarity_threshold?: number;
   limit?: number;
   offset?: number;
+  /** See {@link VectorSearchOptions.queryParams}. */
+  queryParams?: Record<string, any>;
   [extra: string]: any;
 }
 
@@ -63,6 +73,8 @@ export interface HybridSearchOptions {
   rerank_results?: boolean;
   limit?: number;
   offset?: number;
+  /** See {@link VectorSearchOptions.queryParams}. */
+  queryParams?: Record<string, any>;
   [extra: string]: any;
 }
 
@@ -78,6 +90,8 @@ export interface BoostedSearchOptions {
   max_boost_results?: number;
   limit?: number;
   offset?: number;
+  /** See {@link VectorSearchOptions.queryParams}. */
+  queryParams?: Record<string, any>;
   [extra: string]: any;
 }
 
@@ -134,9 +148,13 @@ export class FluxClient {
     return this.transport.request('GET', path, { params });
   }
 
-  async search<T = any>(folderPath: string, body: Record<string, any>): Promise<T> {
+  async search<T = any>(
+    folderPath: string,
+    body: Record<string, any>,
+    options?: { params?: Record<string, any> },
+  ): Promise<T> {
     const path = this.buildPath(folderPath, '/_search');
-    return this.transport.request('POST', path, { jsonBody: body });
+    return this.transport.request('POST', path, { jsonBody: body, params: options?.params });
   }
 
   /**
@@ -191,7 +209,16 @@ export class FluxClient {
 
   /** Semantic search using auto-generated embeddings. */
   async vectorSearch<T = any>(folderPath: string, options: VectorSearchOptions): Promise<T> {
-    const { query, fields, top_k = 10, similarity_threshold, limit, offset, ...rest } = options;
+    const {
+      query,
+      fields,
+      top_k = 10,
+      similarity_threshold,
+      limit,
+      offset,
+      queryParams,
+      ...rest
+    } = options;
     const extra = stripUndefined(rest);
     const vs: VectorSearch = { query, fields, top_k, similarity_threshold };
     const req: SearchRequest = {
@@ -201,7 +228,7 @@ export class FluxClient {
       offset,
     };
     const body = mergeExtra(buildSearchBody(req), extra);
-    return this.search(folderPath, body);
+    return this.search(folderPath, body, { params: queryParams });
   }
 
   /** Search using custom pre-computed embeddings. */
@@ -216,6 +243,7 @@ export class FluxClient {
       similarity_threshold,
       limit,
       offset,
+      queryParams,
       ...rest
     } = options;
     const extra = stripUndefined(rest);
@@ -227,7 +255,7 @@ export class FluxClient {
       offset,
     };
     const body = mergeExtra(buildSearchBody(req), extra);
-    return this.search(folderPath, body);
+    return this.search(folderPath, body, { params: queryParams });
   }
 
   /** Blended text + vector search with configurable weights. */
@@ -243,6 +271,7 @@ export class FluxClient {
       rerank_results = true,
       limit,
       offset,
+      queryParams,
       ...rest
     } = options;
     const extra = stripUndefined(rest);
@@ -257,7 +286,7 @@ export class FluxClient {
       offset,
     };
     const body = mergeExtra(buildSearchBody(req), extra);
-    return this.search(folderPath, body);
+    return this.search(folderPath, body, { params: queryParams });
   }
 
   /** Text search with results boosted by vector similarity. */
@@ -274,6 +303,7 @@ export class FluxClient {
       max_boost_results = 20,
       limit,
       offset,
+      queryParams,
       ...rest
     } = options;
     const extra = stripUndefined(rest);
@@ -318,7 +348,7 @@ export class FluxClient {
       offset,
     };
     const body = mergeExtra(buildSearchBody(req), extra);
-    return this.search(folderPath, body);
+    return this.search(folderPath, body, { params: queryParams });
   }
 
   async getRouter<T = any>(): Promise<T> {

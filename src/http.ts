@@ -192,7 +192,11 @@ export class HttpTransport {
       }
 
       if (response.status >= 400) {
-        if (allowRetries && this.shouldRetry(method, response.status) && attempt < this.retry.attempts) {
+        if (
+          allowRetries &&
+          this.shouldRetry(method, response.status) &&
+          attempt < this.retry.attempts
+        ) {
           const delay = this.computeDelay(attempt, response.headers.get('Retry-After'));
           if (delay > 0) {
             await this.sleep(delay);
