@@ -209,9 +209,7 @@ describe('ManagementClient', () => {
       const [url, init] = fetchMock.mock.calls[0];
       // The sub-resource, not the key itself: re-issuing must never look like a
       // key update, because it must not touch the key.
-      expect(String(url)).toContain(
-        '/v1/env-123/permissions/flux-api/api-keys/fk1/bearer-token/',
-      );
+      expect(String(url)).toContain('/v1/env-123/permissions/flux-api/api-keys/fk1/bearer-token/');
       expect(init?.method).toBe('POST');
     });
 
