@@ -55,6 +55,8 @@ export function managementPaths(environmentKey: string) {
     fluxApiKeysRoot: () => `/v1/${environmentKey}/permissions/flux-api/api-keys`,
     fluxApiKeyRoot: (apiKey: string) =>
       `/v1/${environmentKey}/permissions/flux-api/api-keys/${apiKey}`,
+    fluxApiKeyBearerTokenRoot: (apiKey: string) =>
+      `/v1/${environmentKey}/permissions/flux-api/api-keys/${apiKey}/bearer-token`,
 
     // API management paths
     apisRoot: () => `/v1/${environmentKey}/api`,

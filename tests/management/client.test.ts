@@ -193,6 +193,51 @@ describe('ManagementClient', () => {
       const client = createClient();
       await client.deleteFluxApiKey('fk1');
     });
+
+    it('issueFluxApiKeyBearerToken POSTs to the sub-resource and returns the plaintext', async () => {
+      const token = {
+        bearer_token: 'fxk_A7fQ2mXeKp3vR8sT1uW5yZ2bC6dF9gH0jL4nQ7x',
+        bearer_token_prefix: 'fxk_A7fQ2mXe',
+        bearer_token_issued_at: '2026-08-09T10:24:11.482Z',
+      };
+      const fetchMock = setupMockFetch(token);
+      const client = createClient();
+
+      const result = await client.issueFluxApiKeyBearerToken('fk1');
+
+      expect(result).toEqual(token);
+      const [url, init] = fetchMock.mock.calls[0];
+      // The sub-resource, not the key itself: re-issuing must never look like a
+      // key update, because it must not touch the key.
+      expect(String(url)).toContain(
+        '/v1/env-123/permissions/flux-api/api-keys/fk1/bearer-token/',
+      );
+      expect(init?.method).toBe('POST');
+    });
+
+    it('issueFluxApiKeyBearerToken accepts a key object, like its siblings', async () => {
+      const fetchMock = setupMockFetch({ bearer_token: 'fxk_x' });
+      const client = createClient();
+
+      await client.issueFluxApiKeyBearerToken({ key: 'fk2' } as any);
+
+      expect(String(fetchMock.mock.calls[0][0])).toContain('/api-keys/fk2/bearer-token/');
+    });
+
+    it('revokeFluxApiKeyBearerToken DELETEs the sub-resource, not the key', async () => {
+      const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+      globalThis.fetch = fetchMock;
+      const client = createClient();
+
+      await client.revokeFluxApiKeyBearerToken('fk1');
+
+      const [url, init] = fetchMock.mock.calls[0] as any;
+      // Revoking a token must not revoke the key: a request to the key's own
+      // URL would delete the key and take Simple/Secure down with it.
+      expect(String(url)).toContain('/api-keys/fk1/bearer-token/');
+      expect(String(url)).not.toMatch(/\/api-keys\/fk1\/$/);
+      expect(init?.method).toBe('DELETE');
+    });
   });
 
   describe('APIs', () => {

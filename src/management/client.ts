@@ -27,6 +27,7 @@ import type {
   FieldSummary,
   FluxAPIKeyList,
   FluxAPIKeyRef,
+  FluxAPIKeyBearerToken,
   FluxAPIKeySummary,
   FluxRoleList,
   FluxRoleRef,
@@ -285,6 +286,43 @@ export class ManagementClient {
   async deleteFluxApiKey(key: FluxAPIKeyRef): Promise<void> {
     const k = resolveKey(key);
     await this.request('DELETE', `${this.paths.fluxApiKeyRoot(k)}/`, { parseJson: false });
+  }
+
+  /**
+   * Issue a bearer token for a Flux API key, or replace the existing one.
+   *
+   * A bearer token exists for clients that accept a single token value and send
+   * it as `Authorization: Bearer <token>` with no way to choose the scheme —
+   * hosted MCP connectors, notably the Claude API's `mcp_servers`. Those clients
+   * cannot send `Simple` or `Secure` at all.
+   *
+   * THE PLAINTEXT IS RETURNED ONLY HERE, AND ONLY ONCE. The service stores a
+   * hash, exactly as it does for `secret_key`, so a lost token is re-issued
+   * rather than recovered. Subsequent key reads expose only
+   * `bearer_token_prefix`.
+   *
+   * The key itself is untouched: `public_key`, `secret_key`, `role` and grants
+   * all survive, so `Simple` and `Secure` integrations keep working across a
+   * re-issue. That is what makes this the way to cut off a connector without
+   * recreating a key and reconfiguring everything that uses it.
+   *
+   * There is at most one token per key; calling this again replaces it.
+   */
+  async issueFluxApiKeyBearerToken(key: FluxAPIKeyRef): Promise<FluxAPIKeyBearerToken> {
+    const k = resolveKey(key);
+    return this.request('POST', `${this.paths.fluxApiKeyBearerTokenRoot(k)}/`);
+  }
+
+  /**
+   * Revoke a Flux API key's bearer token. The key and its role keep working.
+   *
+   * Idempotent: succeeds whether or not a token was issued.
+   */
+  async revokeFluxApiKeyBearerToken(key: FluxAPIKeyRef): Promise<void> {
+    const k = resolveKey(key);
+    await this.request('DELETE', `${this.paths.fluxApiKeyBearerTokenRoot(k)}/`, {
+      parseJson: false,
+    });
   }
 
   // ------------------------------------------------------------------ //

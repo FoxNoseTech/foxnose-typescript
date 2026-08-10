@@ -76,6 +76,12 @@ describe('managementPaths', () => {
     expect(paths.fluxApiKeysRoot()).toBe('/v1/env-abc/permissions/flux-api/api-keys');
   });
 
+  it('fluxApiKeyBearerTokenRoot', () => {
+    expect(paths.fluxApiKeyBearerTokenRoot('fk1')).toBe(
+      '/v1/env-abc/permissions/flux-api/api-keys/fk1/bearer-token',
+    );
+  });
+
   it('apisRoot', () => {
     expect(paths.apisRoot()).toBe('/v1/env-abc/api');
   });

@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-10
+
+### Added
+
+- **Flux API key bearer tokens.** An opaque `fxk_` credential bound to a Flux
+  API key, for hosted MCP connectors that accept only a token value and send it
+  as `Authorization: Bearer <token>` — the Claude API's `mcp_servers` among
+  them. Those clients cannot choose a scheme, so `Simple` and `Secure` are not
+  reachable from them and every authentication-required Flux API was out of
+  reach, taking MCP writes with it.
+  - `ManagementClient.issueFluxApiKeyBearerToken(key)` — issues or replaces the
+    token and returns the plaintext. **Returned only here, and only once**: the
+    service stores a hash, so a lost token is re-issued, not recovered.
+  - `ManagementClient.revokeFluxApiKeyBearerToken(key)` — revokes it. The key,
+    its role and its `Simple`/`Secure` credentials are untouched, which is also
+    true of a re-issue: that is what makes this a way to cut off a connector
+    without recreating a key.
+  - `FluxAPIKeyBearerToken` type for the one-time response.
+  - `FluxAPIKeySummary` gains optional `bearer_token_prefix` and
+    `bearer_token_issued_at`. Optional for compatibility with servers that
+    predate the feature; the prefix is the first 12 characters, enough to
+    recognise a token in a config file and never enough to use one.
+
+  Requires a server with bearer-token support; against an older one the two new
+  methods return 404.
+
 ## [0.5.1] - 2026-07-24
 
 ### Added
