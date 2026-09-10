@@ -316,6 +316,56 @@ describe('buildAPIError — write errors', () => {
     expect(err.errorsTruncated).toBe(true);
   });
 
+  it('maps 422 data_validation_error to the same class', () => {
+    // A Flux resource write reports a schema violation with this code. It used
+    // to fall through to a bare FoxnoseAPIError, so the documented
+    // `instanceof ContentValidationFailedError` check never matched the most
+    // common way to reach a schema violation.
+    const detail = { json_path: '$.title', message: 'required' };
+    const err = buildAPIError({
+      message: 'x',
+      statusCode: 422,
+      errorCode: 'data_validation_error',
+      detail,
+    }) as ContentValidationFailedError;
+    expect(err).toBeInstanceOf(ContentValidationFailedError);
+    expect(err.errors).toEqual([detail]);
+    expect(err.errorsTruncated).toBe(false);
+  });
+
+  it('maps 422 data_validation_error (multiple, truncated)', () => {
+    const detail = {
+      json_path: 'multiple',
+      errors: [{ json_path: '$.a' }, { json_path: '$.b' }],
+      errors_truncated: true,
+    };
+    const err = buildAPIError({
+      message: 'x',
+      statusCode: 422,
+      errorCode: 'data_validation_error',
+      detail,
+    }) as ContentValidationFailedError;
+    expect(err).toBeInstanceOf(ContentValidationFailedError);
+    expect(err.errors).toHaveLength(2);
+    expect(err.errorsTruncated).toBe(true);
+  });
+
+  it('keeps the wire error code it was given', () => {
+    const err = buildAPIError({
+      message: 'x',
+      statusCode: 422,
+      errorCode: 'data_validation_error',
+      detail: { json_path: '$.x' },
+    });
+    expect(err.errorCode).toBe('data_validation_error');
+  });
+
+  it('leaves an unrelated 422 as the base error', () => {
+    const err = buildAPIError({ message: 'x', statusCode: 422, errorCode: 'draft_not_supported' });
+    expect(err).not.toBeInstanceOf(ContentValidationFailedError);
+    expect(err.constructor.name).toBe('FoxnoseAPIError');
+  });
+
   it('maps 502 upstream_error', () => {
     const err = buildAPIError({ message: 'x', statusCode: 502, errorCode: 'upstream_error' });
     expect(err).toBeInstanceOf(UpstreamError);
