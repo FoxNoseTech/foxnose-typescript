@@ -168,6 +168,12 @@ export class ExternalIdConflictError extends FoxnoseAPIError {
 
 /**
  * Raised on HTTP 422 when submitted `data` fails the collection's schema.
+ *
+ * Two server error codes mean this, and both map here:
+ * `content_validation_failed` and `data_validation_error`. The latter is what
+ * a Flux resource write returns, so leaving it unmapped meant the most common
+ * way to hit a schema violation raised a bare {@link FoxnoseAPIError}, and
+ * `instanceof ContentValidationFailedError` never matched it.
  */
 export class ContentValidationFailedError extends FoxnoseAPIError {
   /** Individual validation problems; each includes a `json_path`. */
@@ -218,6 +224,15 @@ function getHeader(headers: Record<string, string> | undefined, name: string): s
  * mapping known (statusCode, errorCode) pairs to typed exceptions. Never
  * throws while parsing; malformed payloads fall through to the base class.
  */
+/**
+ * Codes that both describe data rejected by the collection schema.
+ *
+ * The resource-write path raises `RevisionValidationError`
+ * (`data_validation_error`); other paths raise the content variant. They carry
+ * the same detail payload, so both map to the same class.
+ */
+const CONTENT_VALIDATION_CODES = new Set(['content_validation_failed', 'data_validation_error']);
+
 export function buildAPIError(options: APIErrorOptions): FoxnoseAPIError {
   const { statusCode, errorCode, detail, responseHeaders, responseBody } = options;
   const body = isPlainObject(responseBody) ? responseBody : undefined;
@@ -271,7 +286,7 @@ export function buildAPIError(options: APIErrorOptions): FoxnoseAPIError {
     return new ExternalIdConflictError(options);
   }
 
-  if (statusCode === 422 && errorCode === 'content_validation_failed') {
+  if (statusCode === 422 && CONTENT_VALIDATION_CODES.has(errorCode as string)) {
     const d = isPlainObject(detail) ? detail : {};
     const errors = Array.isArray(d.errors) ? d.errors : typeof d.json_path === 'string' ? [d] : [];
     return new ContentValidationFailedError({
