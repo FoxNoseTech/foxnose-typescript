@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path, { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { UploadSignature } from '../../src/flux/models.js';
 import type { FolderSummary, ResourceSummary } from '../../src/management/models.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -51,5 +52,25 @@ describe('SDK shape after composite removal — type-level', () => {
       component: 'cmp-xyz',
     };
     expect(resource.key).toBe('r1');
+  });
+});
+
+// Type-level guard: every field of a grant is always present, and `pnpm typecheck`
+// compiles this file, so a field that turns optional refuses to compile here.
+describe('UploadSignature — type-level', () => {
+  it('has no optional field', () => {
+    const grant: UploadSignature = {
+      publicKey: 'public-key',
+      uploadBaseUrl: 'https://upload.foxnose.net',
+      authToken: 'token',
+      tokenExpire: 1793450000,
+      store: 'auto',
+      metadata: {},
+      upload_id: 'up_eu1_1',
+      status_token: 'status',
+      rotation: 1,
+    };
+    const complete: Required<UploadSignature> = grant;
+    expect(complete.upload_id).toBe('up_eu1_1');
   });
 });

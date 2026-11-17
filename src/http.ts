@@ -244,7 +244,7 @@ export class HttpTransport {
           body = payload;
           if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
             message = payload.message ?? message;
-            errorCode = payload.error_code;
+            errorCode = payload.error_code ?? payload.code;
             detail = payload.detail;
           }
         } catch {

@@ -102,6 +102,61 @@ export class PlanExhaustedError extends FoxnoseAPIError {
 }
 
 /**
+ * Raised on HTTP 402 `files_quota_exceeded` when no file processing units are left.
+ *
+ * `reason` says what ran out, and the matching link is `upgradeUrl` or `raiseCapUrl`.
+ * A refusal relayed by Flux carries the code only, so these fields are undefined there.
+ */
+export class FilesQuotaExceededError extends FoxnoseAPIError {
+  readonly axis?: string;
+  readonly reason?: string;
+  readonly usedUnits?: number;
+  readonly includedUnits?: number | null;
+  readonly capUsd?: number | null;
+  readonly windowResetsAt?: string | null;
+  readonly upgradeUrl?: string;
+  readonly raiseCapUrl?: string;
+
+  constructor(
+    options: APIErrorOptions & {
+      axis?: string;
+      reason?: string;
+      usedUnits?: number;
+      includedUnits?: number | null;
+      capUsd?: number | null;
+      windowResetsAt?: string | null;
+      upgradeUrl?: string;
+      raiseCapUrl?: string;
+    },
+  ) {
+    super(options);
+    this.name = 'FilesQuotaExceededError';
+    this.axis = options.axis;
+    this.reason = options.reason;
+    this.usedUnits = options.usedUnits;
+    this.includedUnits = options.includedUnits;
+    this.capUsd = options.capUsd;
+    this.windowResetsAt = options.windowResetsAt;
+    this.upgradeUrl = options.upgradeUrl;
+    this.raiseCapUrl = options.raiseCapUrl;
+  }
+}
+
+/**
+ * Raised on HTTP 503 `files_quota_unavailable` when the file processing quota could
+ * not be read, so nothing was started. Retry after `retryAfter` seconds.
+ */
+export class FilesQuotaUnavailableError extends FoxnoseAPIError {
+  readonly retryAfter?: number;
+
+  constructor(options: APIErrorOptions & { retryAfter?: number }) {
+    super(options);
+    this.name = 'FilesQuotaUnavailableError';
+    this.retryAfter = options.retryAfter;
+  }
+}
+
+/**
  * Raised on HTTP 403 when a plan entity limit is exceeded.
  */
 export class PlanLimitExceededError extends FoxnoseAPIError {
@@ -219,6 +274,13 @@ function getHeader(headers: Record<string, string> | undefined, name: string): s
   return undefined;
 }
 
+/** `Retry-After` in seconds, or undefined when absent or not a number. */
+function retryAfterSeconds(headers: Record<string, string> | undefined): number | undefined {
+  const raw = getHeader(headers, 'Retry-After');
+  const parsed = raw !== undefined ? Number(raw) : NaN;
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
 /**
  * Builds the most specific {@link FoxnoseAPIError} subclass for a response,
  * mapping known (statusCode, errorCode) pairs to typed exceptions. Never
@@ -258,6 +320,32 @@ export function buildAPIError(options: APIErrorOptions): FoxnoseAPIError {
     });
   }
 
+  if (statusCode === 402 && errorCode === 'files_quota_exceeded' && body) {
+    const numberOrNull = (value: unknown) =>
+      typeof value === 'number' ? value : value === null ? null : undefined;
+    const text = (value: unknown) => (typeof value === 'string' ? value : undefined);
+    return new FilesQuotaExceededError({
+      ...options,
+      message: 'message' in body ? options.message : 'File processing quota reached',
+      axis: text(body.axis),
+      reason: text(body.reason),
+      usedUnits: typeof body.used_units === 'number' ? body.used_units : undefined,
+      includedUnits: numberOrNull(body.included_units),
+      capUsd: numberOrNull(body.cap_usd),
+      windowResetsAt: body.window_resets_at === null ? null : text(body.window_resets_at),
+      upgradeUrl: text(body.upgrade_url),
+      raiseCapUrl: text(body.raise_cap_url),
+    });
+  }
+
+  if (statusCode === 503 && errorCode === 'files_quota_unavailable') {
+    return new FilesQuotaUnavailableError({
+      ...options,
+      message: body && 'message' in body ? options.message : 'File processing quota is unavailable',
+      retryAfter: retryAfterSeconds(responseHeaders),
+    });
+  }
+
   if (statusCode === 403 && errorCode === 'plan_limit_exceeded') {
     const d = isPlainObject(detail) ? detail : {};
     return new PlanLimitExceededError({
@@ -270,11 +358,9 @@ export function buildAPIError(options: APIErrorOptions): FoxnoseAPIError {
   }
 
   if (statusCode === 429 && errorCode === 'rate_limited') {
-    const raw = getHeader(responseHeaders, 'Retry-After');
-    const parsed = raw !== undefined ? Number(raw) : NaN;
     return new RateLimitExceededError({
       ...options,
-      retryAfter: Number.isNaN(parsed) ? undefined : parsed,
+      retryAfter: retryAfterSeconds(responseHeaders),
     });
   }
 
