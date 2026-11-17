@@ -1207,3 +1207,241 @@ export function resolveKey(value: string | { key: string }): string {
   }
   throw new TypeError(`Expected a string or an object with a 'key' attribute, got ${typeof value}`);
 }
+
+// ---------------------------------------------------------------------------
+// Webhooks
+// ---------------------------------------------------------------------------
+
+/** What an endpoint receives: ids and links only, or a snapshot of the content. */
+export type WebhookPayloadMode = 'references' | 'content';
+
+/** `active`, `paused`, or `disabled` by FoxNose after `410 Gone` or five days of failures. */
+export type WebhookEndpointStatus = 'active' | 'paused' | 'disabled';
+
+/** Attempts of the last 24 hours: all of them and those answered with `2xx`. */
+export interface WebhookStats24h {
+  attempts: number;
+  succeeded: number;
+}
+
+/**
+ * A webhook endpoint. It never carries the signing secret. `stats_24h` is set on
+ * the items of a list only.
+ */
+export interface WebhookEndpoint {
+  id: string;
+  url: string;
+  description: string;
+  event_types: string[];
+  collection_keys: string[];
+  payload_mode: WebhookPayloadMode;
+  version: number;
+  status: WebhookEndpointStatus;
+  /** `gone` (it answered `410 Gone`) or `failing` (no success for 5 days). */
+  disabled_reason: string | null;
+  failing_since: string | null;
+  disabled_at: string | null;
+  created_at: string;
+  updated_at: string;
+  stats_24h?: WebhookStats24h;
+}
+
+export type WebhookEndpointList = PaginatedResponse<WebhookEndpoint>;
+
+/**
+ * The answer to creating an endpoint: the endpoint and its signing secret.
+ *
+ * `secret` is not enumerable: `console.log`, `JSON.stringify`, `util.inspect` and a
+ * spread leave it out, and only a direct read, `created.secret`, returns it. Read it
+ * again later with {@link ManagementClient.getWebhookEndpointSecret}.
+ */
+export interface WebhookEndpointCreated extends WebhookEndpoint {
+  readonly secret: string;
+}
+
+/** The current signing secret. `secret` is not enumerable, like {@link WebhookEndpointCreated.secret}. */
+export interface WebhookSecret {
+  readonly secret: string | null;
+}
+
+/**
+ * The answer to rotating a secret. `previous_secret_expires_at` is when the old
+ * secret stops being used, or `null` when none is left. `secret` is not enumerable.
+ */
+export interface WebhookSecretRotation {
+  readonly secret: string;
+  previous_secret_expires_at: string | null;
+}
+
+/** Body of {@link ManagementClient.createWebhookEndpoint}. */
+export interface WebhookEndpointCreateRequest {
+  /** The `https` URL deliveries are sent to. */
+  url: string;
+  /** Event types to receive, at least one. */
+  event_types: string[];
+  /** At most 255 characters. */
+  description?: string;
+  /** Collections to receive events from, at most 50. Empty or omitted for every collection. */
+  collection_keys?: CollectionRef[];
+  /** `references` (the default) or `content`. */
+  payload_mode?: WebhookPayloadMode;
+  /** Payload version; `1` is the only one. */
+  version?: number;
+}
+
+/** Body of {@link ManagementClient.updateWebhookEndpoint}: send only the fields to change. */
+export interface WebhookEndpointUpdateRequest extends Partial<WebhookEndpointCreateRequest> {
+  /** `active` resumes a paused or disabled endpoint and clears its failure streak. */
+  status?: 'active' | 'paused';
+}
+
+/** The endpoint of a delivery or an attempt; `deleted` once it was removed. */
+export interface WebhookEndpointRef {
+  id: string;
+  deleted: boolean;
+}
+
+/** One event sent to one endpoint, with all its attempts. */
+export interface WebhookDelivery {
+  id: string;
+  endpoint: WebhookEndpointRef;
+  /** `pending`, `succeeded` or `dead`. */
+  status: 'pending' | 'succeeded' | 'dead';
+  attempts: number;
+  last_status_code: number | null;
+  last_error: string | null;
+  created_at: string;
+  finished_at: string | null;
+  /** Set only while the delivery is pending. */
+  next_attempt_at: string | null;
+}
+
+/** The event a delivery carries. */
+export interface WebhookDeliveryEvent {
+  id: string;
+  type: string;
+  test: boolean;
+}
+
+/** A delivery in an endpoint's delivery list. `event` is `null` once the event has aged out. */
+export interface WebhookEndpointDelivery extends WebhookDelivery {
+  event_id: string;
+  event: WebhookDeliveryEvent | null;
+}
+
+export type WebhookEndpointDeliveryList = PaginatedResponse<WebhookEndpointDelivery>;
+
+/** How many deliveries of an event are in each status. */
+export interface WebhookDeliveryCounts {
+  pending: number;
+  succeeded: number;
+  dead: number;
+}
+
+/** An event of the log. `delivery_counts` is set on the items of a list only. */
+export interface WebhookEvent {
+  id: string;
+  type: string;
+  created_at: string;
+  test: boolean;
+  collection_key: string | null;
+  delivery_counts?: WebhookDeliveryCounts;
+}
+
+export type WebhookEventList = PaginatedResponse<WebhookEvent>;
+
+/**
+ * One event with its envelope and all its deliveries, oldest first. `envelope` is the
+ * event as a references-only endpoint receives it; the log never returns content.
+ */
+export interface WebhookEventDetail extends WebhookEvent {
+  envelope: Record<string, unknown>;
+  deliveries: WebhookDelivery[];
+}
+
+/**
+ * One try to deliver an event. `response_excerpt` is the first 1 KB of what the
+ * endpoint answered.
+ */
+export interface WebhookAttempt {
+  id: string;
+  delivery_id: string;
+  endpoint: WebhookEndpointRef;
+  created_at: string;
+  status_code: number | null;
+  latency_ms: number;
+  error_class: string | null;
+  response_excerpt: string;
+}
+
+export type WebhookAttemptList = PaginatedResponse<WebhookAttempt>;
+
+/** The answer to sending a test event. */
+export interface WebhookTestEvent {
+  event_id: string;
+  delivery_id: string;
+}
+
+/**
+ * The answer to recovering failed deliveries: `requeued` were queued, and `more` is
+ * `true` when another call with the same `since` has more to do.
+ */
+export interface WebhookRecovery {
+  requeued: number;
+  more: boolean;
+}
+
+/** A delivery created by redelivering an event. */
+export interface WebhookRedelivery {
+  id: string;
+  endpoint_id: string;
+}
+
+/**
+ * An endpoint an event was not redelivered to. `reason` is `deleted`, `paused`,
+ * `disabled` or `endpoint_not_subscribed`.
+ */
+export interface WebhookSkippedEndpoint {
+  endpoint_id: string;
+  reason: string;
+}
+
+/** The answer to redelivering an event. */
+export interface WebhookRedeliveryResult {
+  event_id: string;
+  deliveries: WebhookRedelivery[];
+  skipped: WebhookSkippedEndpoint[];
+}
+
+/** An event type of the catalogue. `collection_scoped` is true when every event of the type belongs to a collection. */
+export interface WebhookEventType {
+  name: string;
+  description: string;
+  collection_scoped: boolean;
+  /** JSON Schemas (draft 2020-12) of the event's `data` per payload mode. */
+  schemas: {
+    references: Record<string, unknown>;
+    content: Record<string, unknown>;
+  };
+}
+
+/** The event-type catalogue; it is not paginated. */
+export interface WebhookEventTypeList {
+  results: WebhookEventType[];
+}
+
+/** Filters of {@link ManagementClient.listWebhookEvents}. */
+export interface WebhookEventListParams {
+  type?: string;
+  /** An endpoint `id`. */
+  endpoint?: string;
+  status?: 'pending' | 'succeeded' | 'dead';
+  /** `true` for test events only, `false` to leave them out. */
+  test?: boolean;
+  /** ISO 8601; a time without a zone is read as UTC. */
+  after?: string;
+  before?: string;
+  /** At most 200. */
+  limit?: number;
+  offset?: number;
+}

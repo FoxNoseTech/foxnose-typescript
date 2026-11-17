@@ -15,6 +15,7 @@ Official TypeScript SDK for the [FoxNose](https://foxnose.net/?utm_source=github
 - **Four auth strategies** — Anonymous, JWT, Simple key, and Secure (ECDSA P-256)
 - **Flux introspection** — discover route contracts with `/_router` and `/_schema`
 - **FoxNose Files** — upload links, analysis, review, policy and short-lived downloads
+- **Outbound webhooks** — endpoints, signing secrets, the event log, redelivery and recovery
 - **Zero dependencies** — uses only Node.js built-in modules
 - **Dual output** — ESM and CommonJS builds with full `.d.ts` declarations
 
@@ -422,6 +423,70 @@ A client with no key reads the end user's view with `status_token`. It never car
 const flux = new FluxClient({ baseUrl, apiPrefix: 'support', auth: new AnonymousAuth() });
 const status = await flux.getUploadStatus(path, uploadId, { statusToken });
 ```
+
+## Webhooks
+
+FoxNose sends a signed `POST` to your endpoint when a subscribed event happens. Endpoints and the event log run through the Management client. The calls need the `webhooks` permission: `read` to list and read, `create`, `update` for every action on an endpoint, `delete`.
+
+```typescript
+const endpoint = await client.createWebhookEndpoint({
+  url: 'https://hooks.example.com/foxnose',
+  event_types: ['revision.published', 'resource.deleted'],
+  collection_keys: ['mK8nP3tYvBcX'], // omit for every collection
+  payload_mode: 'content', // or 'references' (the default)
+});
+storeSecret(endpoint.secret); // also readable later with getWebhookEndpointSecret
+
+await client.sendWebhookTestEvent(endpoint.id, 'revision.published');
+
+// After an outage: send the failed deliveries of the last day again.
+const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+let more = true;
+while (more) {
+  ({ more } = await client.recoverWebhookDeliveries(endpoint.id, since));
+}
+
+const failed = await client.listWebhookEvents({ endpoint: endpoint.id, status: 'dead' });
+for (const event of failed.results) {
+  await client.redeliverWebhookEvent(event.id, { endpoint_id: endpoint.id });
+}
+```
+
+| Call | What it does |
+|---|---|
+| `listWebhookEndpoints` / `createWebhookEndpoint` / `getWebhookEndpoint` / `updateWebhookEndpoint` / `deleteWebhookEndpoint` | Endpoints of the environment; a list carries `stats_24h` |
+| `listWebhookEndpointDeliveries` | An endpoint's deliveries, each with the event it carries |
+| `getWebhookEndpointSecret` / `rotateWebhookEndpointSecret` | Read or replace the signing secret |
+| `sendWebhookTestEvent` | A sample event to one endpoint |
+| `recoverWebhookDeliveries` | Send an endpoint's failed deliveries again |
+| `listWebhookEvents` / `getWebhookEvent` / `listWebhookEventAttempts` | The 30-day event log |
+| `redeliverWebhookEvent` | Send a logged event again |
+| `listWebhookEventTypes` | The event-type catalogue with JSON Schemas |
+
+`updateWebhookEndpoint` sends only the fields given, and `status: 'active'` resumes a paused or disabled endpoint. `rotateWebhookEndpointSecret` keeps the old secret valid for 24 hours unless you pass `{ expire_previous_now: true }`.
+
+The signing `secret` is a credential. The responses that carry it (`createWebhookEndpoint`, `getWebhookEndpointSecret`, `rotateWebhookEndpointSecret`) define it as a non-enumerable property: `console.log`, `JSON.stringify`, `util.inspect` and a spread leave it out, and `response.secret` still returns it. Keep it out of logs.
+
+Deliveries follow [Standard Webhooks](https://www.standardwebhooks.com/), so the SDK has no verifier of its own: use a Standard Webhooks library with the endpoint's secret.
+
+```typescript
+// npm install standardwebhooks
+import { Webhook } from 'standardwebhooks';
+
+const event = new Webhook(secret).verify(rawBody, headers); // throws on a bad signature
+```
+
+These errors are subclasses of `FoxnoseAPIError`:
+
+| Error | Status / code |
+|---|---|
+| `WebhookEndpointNotFoundError` | 404 `webhook_endpoint_not_found` |
+| `WebhookEventNotFoundError` | 404 `webhook_event_not_found` |
+| `WebhookEndpointLimitExceededError` | 409 `limit_exceeded` (20 endpoints per environment) |
+| `WebhookEndpointNotActiveError` | 409 `endpoint_not_active`, with `reason` and `skipped` |
+| `WebhookEndpointNotSubscribedError` | 409 `endpoint_not_subscribed`, with `skipped` |
+
+A rejected request body is a `400` `FoxnoseAPIError`: `errorCode` is the code (`invalid_url`, `unknown_event_type`, `unknown_collection`, ...) and `detail` says what is wrong when there is something to say: `field`, and for example `unknown` or `reason`.
 
 ## Authentication
 

@@ -141,4 +141,10 @@ describe('managementPaths', () => {
   it('localeRoot', () => {
     expect(paths.localeRoot('en')).toBe('/v1/env-abc/locales/en');
   });
+
+  it('webhook paths', () => {
+    expect(paths.webhooksRoot()).toBe('/v1/env-abc/webhooks');
+    expect(paths.webhookEndpointRoot('ep/1')).toBe('/v1/env-abc/webhooks/endpoints/ep%2F1');
+    expect(paths.webhookEventRoot('evt_1')).toBe('/v1/env-abc/webhooks/events/evt_1');
+  });
 });

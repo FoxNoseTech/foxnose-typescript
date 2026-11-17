@@ -59,6 +59,13 @@ export function managementPaths(environmentKey: string) {
       `/v1/${environmentKey}/collections/${collectionKey}/files-policy`,
     filesReviewRoot: () => `/v1/${environmentKey}/files/review`,
 
+    // Webhooks paths
+    webhooksRoot: () => `/v1/${environmentKey}/webhooks`,
+    webhookEndpointRoot: (endpointId: string) =>
+      `/v1/${environmentKey}/webhooks/endpoints/${encodeURIComponent(endpointId)}`,
+    webhookEventRoot: (eventId: string) =>
+      `/v1/${environmentKey}/webhooks/events/${encodeURIComponent(eventId)}`,
+
     // Caller's own permissions
     myPermissionsRoot: () => `/v1/${environmentKey}/permissions/me`,
 

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Outbound webhooks** on `ManagementClient`, with typed responses:
+  - Endpoints: `listWebhookEndpoints` (items carry `stats_24h`), `createWebhookEndpoint`, `getWebhookEndpoint`, `updateWebhookEndpoint`, `deleteWebhookEndpoint`, `listWebhookEndpointDeliveries`.
+  - Signing secrets: `getWebhookEndpointSecret`, `rotateWebhookEndpointSecret`.
+  - Test and recovery: `sendWebhookTestEvent`, `recoverWebhookDeliveries`.
+  - Event log: `listWebhookEvents`, `getWebhookEvent`, `listWebhookEventAttempts`, `redeliverWebhookEvent`, and `listWebhookEventTypes` for the catalogue with JSON Schemas.
+- `WebhookEndpointNotFoundError` (404 `webhook_endpoint_not_found`), `WebhookEventNotFoundError` (404 `webhook_event_not_found`), `WebhookEndpointLimitExceededError` (409 `limit_exceeded`), `WebhookEndpointNotActiveError` (409 `endpoint_not_active`, with `reason` and `skipped`) and `WebhookEndpointNotSubscribedError` (409 `endpoint_not_subscribed`, with `skipped`), subclasses of `FoxnoseAPIError`.
+- The signing `secret` of a response is a non-enumerable property: `console.log`, `JSON.stringify`, `util.inspect` and a spread leave it out, and `response.secret` still returns it. The SDK does not verify signatures: deliveries follow Standard Webhooks, so use a Standard Webhooks library.
+
 ## [0.7.0] - 2026-11-17
 
 ### Added

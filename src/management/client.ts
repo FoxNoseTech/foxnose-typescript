@@ -76,6 +76,22 @@ import type {
   UploadLinkCreated,
   UploadLinkCreateRequest,
   UploadLinkList,
+  WebhookAttemptList,
+  WebhookEndpoint,
+  WebhookEndpointCreateRequest,
+  WebhookEndpointCreated,
+  WebhookEndpointDeliveryList,
+  WebhookEndpointList,
+  WebhookEndpointUpdateRequest,
+  WebhookEventDetail,
+  WebhookEventList,
+  WebhookEventListParams,
+  WebhookEventTypeList,
+  WebhookRecovery,
+  WebhookRedeliveryResult,
+  WebhookSecret,
+  WebhookSecretRotation,
+  WebhookTestEvent,
 } from './models.js';
 import { resolveKey } from './models.js';
 import { managementPaths } from './paths.js';
@@ -111,6 +127,33 @@ export interface ApiFolderOptions extends ApiFolderRouteDescriptionOptions {
    * corresponding `unscopedLevels`. Wire field `unscoped_ancestors`.
    */
   unscopedAncestors?: string[];
+}
+
+/**
+ * Make the signing secret of a response non-enumerable: `console.log`,
+ * `JSON.stringify`, `util.inspect` and a spread leave it out, and a direct read,
+ * `response.secret`, still returns it.
+ */
+function hideSecret<T extends { secret?: string | null }>(response: T): T {
+  if (response && typeof response === 'object' && 'secret' in response) {
+    Object.defineProperty(response, 'secret', {
+      value: response.secret,
+      enumerable: false,
+      writable: false,
+      configurable: true,
+    });
+  }
+  return response;
+}
+
+/** The body of an endpoint create or update, with collection keys resolved. */
+function webhookEndpointBody(
+  request: WebhookEndpointCreateRequest | WebhookEndpointUpdateRequest,
+): Record<string, unknown> {
+  const { collection_keys, ...rest } = request;
+  return collection_keys === undefined
+    ? rest
+    : { ...rest, collection_keys: collection_keys.map((key) => resolveKey(key)) };
 }
 
 /**
@@ -2099,6 +2142,200 @@ export class ManagementClient {
    */
   async getMyPermissions(): Promise<MyPermissions> {
     return this.request('GET', `${this.paths.myPermissionsRoot()}/`);
+  }
+
+  // ------------------------------------------------------------------ //
+  // Webhooks
+  // ------------------------------------------------------------------ //
+
+  /**
+   * List the environment's webhook endpoints, newest first. Each item carries
+   * `stats_24h`; secrets are never included. `params` carries `status` (`active`,
+   * `paused` or `disabled`), `limit` (at most 200) and `offset`.
+   */
+  async listWebhookEndpoints(params?: Record<string, any>): Promise<WebhookEndpointList> {
+    return this.request('GET', `${this.paths.webhooksRoot()}/endpoints/`, { params });
+  }
+
+  /**
+   * Create a webhook endpoint.
+   *
+   * The answer carries the signing `secret`, which is not enumerable: read it as
+   * `created.secret`, and read it again later with {@link getWebhookEndpointSecret}.
+   * An environment holds at most 20 endpoints ({@link WebhookEndpointLimitExceededError}).
+   * A `content` endpoint also needs read access to the content it will deliver.
+   */
+  async createWebhookEndpoint(
+    request: WebhookEndpointCreateRequest,
+  ): Promise<WebhookEndpointCreated> {
+    const created = await this.transport.request(
+      'POST',
+      `${this.paths.webhooksRoot()}/endpoints/`,
+      {
+        jsonBody: webhookEndpointBody(request),
+        allowRetries: false,
+      },
+    );
+    return hideSecret(created);
+  }
+
+  /** Read one webhook endpoint. It carries neither the secret nor `stats_24h`. */
+  async getWebhookEndpoint(endpointId: string): Promise<WebhookEndpoint> {
+    return this.request('GET', `${this.paths.webhookEndpointRoot(endpointId)}/`);
+  }
+
+  /**
+   * Change the given fields of an endpoint and leave the rest alone.
+   *
+   * `status: 'active'` resumes a paused or disabled endpoint and clears its failure
+   * streak; events that happened meanwhile are not sent, but failed deliveries can be
+   * sent again with {@link recoverWebhookDeliveries}.
+   */
+  async updateWebhookEndpoint(
+    endpointId: string,
+    changes: WebhookEndpointUpdateRequest,
+  ): Promise<WebhookEndpoint> {
+    return this.request('PATCH', `${this.paths.webhookEndpointRoot(endpointId)}/`, {
+      jsonBody: webhookEndpointBody(changes),
+    });
+  }
+
+  /**
+   * Delete an endpoint and its pending deliveries. Its finished deliveries and
+   * attempts stay in the event log for 30 days, with `endpoint.deleted` true.
+   */
+  async deleteWebhookEndpoint(endpointId: string): Promise<void> {
+    await this.request('DELETE', `${this.paths.webhookEndpointRoot(endpointId)}/`, {
+      parseJson: false,
+    });
+  }
+
+  /**
+   * List an endpoint's deliveries, newest first, each with the event it carries.
+   * `params` carries `limit` (at most 200) and `offset`.
+   */
+  async listWebhookEndpointDeliveries(
+    endpointId: string,
+    params?: Record<string, any>,
+  ): Promise<WebhookEndpointDeliveryList> {
+    return this.request('GET', `${this.paths.webhookEndpointRoot(endpointId)}/deliveries/`, {
+      params,
+    });
+  }
+
+  /**
+   * Read the endpoint's current signing secret: the newest, during a rotation. Needs
+   * `webhooks:update`. `secret` is not enumerable: read it as `response.secret`.
+   */
+  async getWebhookEndpointSecret(endpointId: string): Promise<WebhookSecret> {
+    const response = await this.request(
+      'GET',
+      `${this.paths.webhookEndpointRoot(endpointId)}/secret/`,
+    );
+    return hideSecret(response);
+  }
+
+  /**
+   * Create a new signing secret and return it.
+   *
+   * The previous secret stays valid for 24 hours, and deliveries carry a signature for
+   * each valid secret; with `expire_previous_now` it stops at once. Needs
+   * `webhooks:update`. `secret` is not enumerable: read it as `rotation.secret`.
+   */
+  async rotateWebhookEndpointSecret(
+    endpointId: string,
+    options?: { expire_previous_now?: boolean },
+  ): Promise<WebhookSecretRotation> {
+    const response = await this.transport.request(
+      'POST',
+      `${this.paths.webhookEndpointRoot(endpointId)}/secret/rotate/`,
+      {
+        jsonBody: { expire_previous_now: options?.expire_previous_now ?? false },
+        allowRetries: false,
+      },
+    );
+    return hideSecret(response);
+  }
+
+  /**
+   * Send a sample event of `eventType` to this endpoint only, with `test` true in the
+   * envelope. It is sent whatever the endpoint's event types and collection filter,
+   * but the endpoint must be active ({@link WebhookEndpointNotActiveError}).
+   */
+  async sendWebhookTestEvent(endpointId: string, eventType: string): Promise<WebhookTestEvent> {
+    return this.transport.request('POST', `${this.paths.webhookEndpointRoot(endpointId)}/test/`, {
+      jsonBody: { event_type: eventType },
+      allowRetries: false,
+    });
+  }
+
+  /**
+   * Send again the endpoint's failed deliveries created at or after `since`.
+   *
+   * Each becomes a new pending delivery of the same event. One call queues at most
+   * 10,000 deliveries; when `more` is true, call again with the same `since`. `since`
+   * is an ISO 8601 time within the last 30 days; a time without a zone is read as UTC.
+   */
+  async recoverWebhookDeliveries(
+    endpointId: string,
+    since: string | Date,
+  ): Promise<WebhookRecovery> {
+    return this.transport.request(
+      'POST',
+      `${this.paths.webhookEndpointRoot(endpointId)}/recover/`,
+      {
+        jsonBody: { since: since instanceof Date ? since.toISOString() : since },
+        allowRetries: false,
+      },
+    );
+  }
+
+  /**
+   * List the events of the last 30 days, newest first, with `delivery_counts`.
+   * `params` carries `type`, `endpoint` (an endpoint `id`), `status` (`pending`,
+   * `succeeded` or `dead`), `test`, `after`, `before` (ISO 8601), `limit` (at most 200)
+   * and `offset`.
+   */
+  async listWebhookEvents(params?: WebhookEventListParams): Promise<WebhookEventList> {
+    return this.request('GET', `${this.paths.webhooksRoot()}/events/`, { params });
+  }
+
+  /** Read one event with its envelope and all its deliveries, oldest first. */
+  async getWebhookEvent(eventId: string): Promise<WebhookEventDetail> {
+    return this.request('GET', `${this.paths.webhookEventRoot(eventId)}/`);
+  }
+
+  /**
+   * List every attempt to deliver the event, across endpoints, oldest first. `params`
+   * carries `limit` (at most 200) and `offset`.
+   */
+  async listWebhookEventAttempts(
+    eventId: string,
+    params?: Record<string, any>,
+  ): Promise<WebhookAttemptList> {
+    return this.request('GET', `${this.paths.webhookEventRoot(eventId)}/attempts/`, { params });
+  }
+
+  /**
+   * Send the event again as a new delivery, with the same event `id`.
+   *
+   * With `endpoint_id` the event goes to that endpoint. Without it, the event goes to
+   * every endpoint that had a delivery of it and is active and subscribed to it now;
+   * the others are listed in `skipped`.
+   */
+  async redeliverWebhookEvent(
+    eventId: string,
+    options?: { endpoint_id?: string },
+  ): Promise<WebhookRedeliveryResult> {
+    return this.transport.request('POST', `${this.paths.webhookEventRoot(eventId)}/redeliver/`, {
+      jsonBody: options?.endpoint_id !== undefined ? { endpoint_id: options.endpoint_id } : {},
+      allowRetries: false,
+    });
+  }
+
+  /** List the event-type catalogue with the JSON Schema of each payload mode. */
+  async listWebhookEventTypes(): Promise<WebhookEventTypeList> {
+    return this.request('GET', `${this.paths.webhooksRoot()}/event-types/`);
   }
 
   private fileRoot(collectionKey: CollectionRef, resourceKey: ResourceRef): string {
