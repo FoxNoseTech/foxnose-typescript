@@ -5,6 +5,8 @@ import { HttpTransport } from '../http.js';
 import type {
   HybridConfig,
   SearchRequest,
+  UploadSignature,
+  UploadStatus,
   VectorBoostConfig,
   VectorFieldSearch,
   VectorSearch,
@@ -205,6 +207,54 @@ export class FluxClient {
   ): Promise<T> {
     const path = this.buildPath(folderPath, `/${resourceKey}/`);
     return this.transport.request('PUT', path, { jsonBody: { data }, allowRetries: false });
+  }
+
+  /**
+   * Get a grant for one upload to a files collection.
+   *
+   * The grant is a credential: pass it on, do not log it. For a strict collection
+   * `folderPath` names the owner, e.g. `support/tickets/tk_1/attachments`. Needs a
+   * key with create access to the collection.
+   *
+   * `options.sessionKey` is an optional idempotency key of 43 URL-safe characters:
+   * a repeat with the same key, collection and owner reaches the same upload
+   * session. A failed request is never retried automatically, so send one to
+   * retry safely.
+   */
+  async createUploadSignature(
+    folderPath: string,
+    options?: { sessionKey?: string },
+  ): Promise<UploadSignature> {
+    const path = this.buildPath(folderPath, '/_upload-signature');
+    const sessionKey = options?.sessionKey;
+    return this.transport.request('POST', path, {
+      jsonBody: sessionKey === undefined ? undefined : { session_key: sessionKey },
+      allowRetries: false,
+    });
+  }
+
+  /**
+   * Read the status of an upload.
+   *
+   * A key reads the uploads that key started, and the path must name the same
+   * collection and owner. Any other combination is `404 not_found`, which includes
+   * a link made through the Management API: read that one with
+   * `ManagementClient.getUploadLink`.
+   *
+   * `options.statusToken` is the end user's token from the grant, for a client that
+   * holds no key (use `AnonymousAuth`). It answers the end user's view, which never
+   * carries a record key. A request authenticated by a key ignores it.
+   */
+  async getUploadStatus(
+    folderPath: string,
+    uploadId: string,
+    options?: { statusToken?: string },
+  ): Promise<UploadStatus> {
+    const path = this.buildPath(folderPath, `/_uploads/${encodeURIComponent(uploadId)}`);
+    const statusToken = options?.statusToken;
+    return this.transport.request('GET', path, {
+      headers: statusToken === undefined ? undefined : { 'X-Upload-Status-Token': statusToken },
+    });
   }
 
   /** Semantic search using auto-generated embeddings. */

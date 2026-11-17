@@ -13,4 +13,7 @@ export type {
   VectorBoostConfig,
   HybridConfig,
   SearchRequest,
+  UploadFileStatus,
+  UploadSignature,
+  UploadStatus,
 } from './models.js';

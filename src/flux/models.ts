@@ -235,3 +235,58 @@ export function mergeExtra(
   }
   return { ...validated, ...extra };
 }
+
+/**
+ * A grant for one upload to a files collection.
+ *
+ * The grant is a credential. The field names are the wire names, so the object
+ * can go to a browser as it is, and that same object prints every token: keep it
+ * out of logs and error reports.
+ */
+export interface UploadSignature {
+  publicKey: string;
+  /** The upload host. */
+  uploadBaseUrl: string;
+  authToken: string;
+  /** When the token ends, in Unix seconds. */
+  tokenExpire: number;
+  /** Passed to the upload unchanged. */
+  store: string;
+  /** Passed to the upload unchanged. */
+  metadata: Record<string, unknown>;
+  /** The id to poll with {@link FluxClient.getUploadStatus}. */
+  upload_id: string;
+  /** The end user's token for reading the status. */
+  status_token: string;
+  /** The order of status tokens in a session. */
+  rotation: number;
+}
+
+/**
+ * The status of one file of an upload.
+ *
+ * A key sees `state` as `processing`, `ready` (with `record_key`),
+ * `pending_review` or `rejected` (with `public_reason`). A status token sees
+ * `processing`, `accepted` or `rejected`, with `user_status`, `reason` and `slot`.
+ */
+export interface UploadFileStatus {
+  state: string;
+  record_key?: string | null;
+  public_reason?: string;
+  user_status?: string;
+  reason?: string;
+  slot?: number;
+}
+
+/**
+ * The status of an upload.
+ *
+ * For an upload of one file these are that file's fields. For a link of several
+ * files, `state` is `processing` or `done` and `files` and `remaining` are set; a
+ * status token also gets `slots_uploading`.
+ */
+export interface UploadStatus extends UploadFileStatus {
+  files?: UploadFileStatus[];
+  remaining?: number;
+  slots_uploading?: { slot: number }[];
+}

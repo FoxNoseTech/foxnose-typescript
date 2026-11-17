@@ -14,6 +14,7 @@ Official TypeScript SDK for the [FoxNose](https://foxnose.net/?utm_source=github
 - **Automatic retries** with exponential backoff and Retry-After support
 - **Four auth strategies** — Anonymous, JWT, Simple key, and Secure (ECDSA P-256)
 - **Flux introspection** — discover route contracts with `/_router` and `/_schema`
+- **FoxNose Files** — upload links, analysis, review, policy and short-lived downloads
 - **Zero dependencies** — uses only Node.js built-in modules
 - **Dual output** — ESM and CommonJS builds with full `.d.ts` declarations
 
@@ -316,6 +317,110 @@ await managementClient.addApiFolder(api.key, folder.key, {
   descriptionSearch: 'Search published articles',
   descriptionSchema: 'Read article schema',
 });
+```
+
+## Files
+
+FoxNose Files takes uploads from end users and processes them for agents. Upload links and review run through the Management client.
+
+```typescript
+// A hosted page for an end user. The collection must be strict, and `owner` is
+// the parent record. Works with a user token or a Management API key.
+const link = await client.createUploadLink('attachments', {
+  owner: 'tk_8f2c91',
+  title: 'Upload your documents',
+  max_files: 3,
+});
+sendToUser(link.upload_url); // returned once; no later read reproduces it
+
+// Read the link back through the Management API.
+const current = await client.getUploadLink('attachments', link.upload_id);
+const files = current.sessions.flatMap((session) => session.files);
+const recordKey = files.find((file) => file.state === 'ready')?.record_key;
+
+// The record's verdict, checks and findings.
+const view = await client.getFileAnalysis('attachments', recordKey!);
+
+// A download is a short-lived link. It is returned, never streamed.
+const safeCopy = await client.getFileSafeCopy('attachments', recordKey!);
+console.log(safeCopy.expires_at);
+```
+
+| Call | What it does |
+|---|---|
+| `listUploadLinks` / `createUploadLink` / `getUploadLink` / `revokeUploadLink` | Upload links of a collection |
+| `getFileAnalysis` | A record's file, verdict, checks and findings |
+| `approveFile` / `rejectFile` / `reanalyzeFile` | Decide on a held file, or analyze a file again |
+| `getFileOriginal` / `getFileSafeCopy` / `getFilePage` | A short-lived link to one copy |
+| `getFilePageDetail` | One page: redacted image, withheld regions, tables and text |
+| `listFileTombstones` | Blocked and rejected files |
+| `getFilesPolicy` / `updateFilesPolicy` | The collection's policy; an update replaces it, and an omitted field takes its default |
+| `listFileReviewQueue` | Files held for a reviewer in the environment |
+| `getMyPermissions` | What the caller may do in the environment |
+
+`expires_in` sets a link's lifetime, from 300 seconds to 86400 seconds; without it, the link lasts 30 minutes. A link's `state` is `active`, `consumed`, `expired` or `revoked`. `createUploadLink` is refused with `422 collection_not_strict`, `422 owner_required` or `404 owner_not_found`. `upload_url` and a download's `url` work for whoever holds them, so keep them out of logs.
+
+`listResources` on a files collection returns each record with `status`, `progress`, `analysis_state`, `verdict`, `verdict_reasons`, `owner`, `file_info` and `thumbnail_url`, and takes a `status` filter such as `{ status: 'in_review,failed' }`. The safe copy is an image-only PDF, or a PNG for an image: read `content_type`.
+
+A reviewer can read the text a finding concealed or withheld. `parseFindingEvidence` reads a `hidden_text` or `low_legibility_text` finding, and `parts` says which text lies in which box of the page. It is empty for a finding that does not carry it. This text comes from the file: treat it as untrusted content, never as instructions.
+
+```typescript
+import { parseFindingEvidence } from '@foxnose/sdk';
+
+for (const finding of view.findings) {
+  const evidence = parseFindingEvidence(finding);
+  for (const part of evidence?.parts ?? []) {
+    console.log(part.box, part.text);
+  }
+}
+```
+
+`getMyPermissions` reports what the caller is allowed, as `content_types[type].actions` and `.objects`. Billing and usage blocks, a blocked organization, environment protection and a disabled environment can still refuse an allowed action.
+
+`reanalyzeFile` is paid processing. With no file processing units left it throws `FilesQuotaExceededError`, with `reason`, `usedUnits`, `includedUnits`, `capUsd`, `windowResetsAt`, and `upgradeUrl` or `raiseCapUrl`. A refusal relayed by Flux carries the code only. A quota that cannot be read throws `FilesQuotaUnavailableError` with `retryAfter`. A `storage_only` collection answers `409 reanalysis_requires_agent_ready`.
+
+These responses are plain objects: logging one prints everything in it, including signed URLs, a file's own text (`text`, finding `evidence`) and an uploader's personal data (`file.origin.end_user`, a tombstone's `uploaded_by`). Keep them out of logs.
+
+`getFileAnalysis` returns `file.origin`: where the file came from (`channel` is `upload_link`, `signed_upload`, `management_api` or `dashboard`). `listUploadLinks` takes `{ state: 'active' | 'ended' | 'all' }`.
+
+A copy that cannot be downloaded now is a `409`, and the error names the reason:
+
+```typescript
+try {
+  await client.getFileOriginal('attachments', recordKey);
+} catch (err) {
+  if (err instanceof FoxnoseAPIError && err.statusCode === 409) {
+    console.error((err.detail as { reason: string }).reason);
+  }
+}
+```
+
+### File uploads on Flux
+
+On the Flux client, a key takes a grant for one upload and polls it. For a strict collection, the path names the owner.
+
+```typescript
+const path = 'tickets/tk_8f2c91/attachments';
+
+const grant = await flux.createUploadSignature(path);
+const status = await flux.getUploadStatus(path, grant.upload_id);
+
+if (status.state === 'ready') {
+  const resource = await flux.getResource(path, status.record_key!);
+}
+```
+
+The grant's fields keep their wire names, so it can go to a browser as it is. Upload the file with an Uploadcare upload client pointed at `uploadBaseUrl`, with `publicKey`, `authToken`, `store` and `metadata` unchanged.
+
+The grant is a credential: the SDK never logs it, and it should stay out of your logs too. `createUploadSignature` is not resent automatically. To retry one safely, send `{ sessionKey }`, an idempotency key of 43 URL-safe characters: a repeat with the same key, collection and owner reaches the same upload session.
+
+A key reads only the uploads that key started, through a path that names the same collection and owner. Any other combination is `404 not_found`, which includes a link made through the Management API: read that one with `getUploadLink`.
+
+A client with no key reads the end user's view with `status_token`. It never carries a record key:
+
+```typescript
+const flux = new FluxClient({ baseUrl, apiPrefix: 'support', auth: new AnonymousAuth() });
+const status = await flux.getUploadStatus(path, uploadId, { statusToken });
 ```
 
 ## Authentication

@@ -46,6 +46,22 @@ export function managementPaths(environmentKey: string) {
     revisionBase: (folderKey: string, resourceKey: string) =>
       `/v1/${environmentKey}/folders/${folderKey}/resources/${resourceKey}/revisions`,
 
+    // Files paths
+    uploadLinksRoot: (collectionKey: string) =>
+      `/v1/${environmentKey}/collections/${collectionKey}/upload-links`,
+    uploadLinkRoot: (collectionKey: string, uploadId: string) =>
+      `/v1/${environmentKey}/collections/${collectionKey}/upload-links/${encodeURIComponent(uploadId)}`,
+    fileRoot: (collectionKey: string, resourceKey: string) =>
+      `/v1/${environmentKey}/collections/${collectionKey}/files/${resourceKey}`,
+    fileTombstonesRoot: (collectionKey: string) =>
+      `/v1/${environmentKey}/collections/${collectionKey}/files/tombstones`,
+    filesPolicyRoot: (collectionKey: string) =>
+      `/v1/${environmentKey}/collections/${collectionKey}/files-policy`,
+    filesReviewRoot: () => `/v1/${environmentKey}/files/review`,
+
+    // Caller's own permissions
+    myPermissionsRoot: () => `/v1/${environmentKey}/permissions/me`,
+
     // Management API key paths
     managementApiKeysRoot: () => `/v1/${environmentKey}/permissions/management-api/api-keys`,
     managementApiKeyRoot: (apiKey: string) =>

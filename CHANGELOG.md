@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **FoxNose Files** on `ManagementClient`, with typed responses:
+  - Upload links: `listUploadLinks`, `createUploadLink`, `getUploadLink`, `revokeUploadLink`.
+  - A record's file: `getFileAnalysis`, `approveFile`, `rejectFile`, `reanalyzeFile`.
+  - Short-lived download links: `getFileOriginal`, `getFileSafeCopy`, `getFilePage`, and `getFilePageDetail` for one page's image, withheld regions, tables and text.
+  - Collection and environment: `listFileTombstones`, `getFilesPolicy`, `updateFilesPolicy`, `listFileReviewQueue`.
+- **File uploads** on `FluxClient`: `createUploadSignature` and `getUploadStatus`, with `UploadSignature` and `UploadStatus` types.
+- `patchOrganization`, `patchCollection` and `patchComponent` on `ManagementClient` write only the fields they are given.
+- `getMyPermissions` on `ManagementClient` reads what the caller may do in the environment, with `MyPermissions`, `ContentTypeAccess` and `EnvironmentAccess` types.
+- `RevisionSummary.schema_version_number` and `RevisionSummary.file`.
+- `ResourceSummary` types `name_is_auto` and `file`, and on a record of a files collection `owner`, `status`, `progress`, `analysis_state`, `thumbnail_url`, `file_info`, `verdict` and `verdict_reasons`.
+- `parseFindingEvidence` reads the text a `hidden_text` or `low_legibility_text` finding holds, with `FileTextEvidence.parts` for the text of each zone.
+- `OrganizationSummary.is_verified` and `verification_method`.
+- `FilesQuotaExceededError` (HTTP 402 `files_quota_exceeded`), a subclass of `FoxnoseAPIError`, with `axis`, `reason`, `usedUnits`, `includedUnits`, `capUsd`, `windowResetsAt`, `upgradeUrl` and `raiseCapUrl`.
+- `FilesQuotaUnavailableError` (HTTP 503 `files_quota_unavailable`) with `retryAfter`.
+- `FileDownloadOptions.origin` (`FileOrigin`): where a record's file came from.
+- `ResourceSummary.guardrails` and `RevisionSummary.guardrails`: the trust summary where the API computes one.
+
+### Changed
+
+- `RevisionSummary.schema_version` is `string | null`: it is `null` when the schema version is gone.
+
 ## [0.6.1] - 2026-09-10
 
 ### Fixed

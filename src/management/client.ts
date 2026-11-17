@@ -25,6 +25,13 @@ import type {
   EnvironmentSummary,
   FieldList,
   FieldSummary,
+  FileDownload,
+  FilePageDetail,
+  FileRecordView,
+  FileReviewQueue,
+  FilesPolicy,
+  FilesPolicyBody,
+  FileTombstoneList,
   FluxAPIKeyList,
   FluxAPIKeyRef,
   FluxAPIKeyBearerToken,
@@ -43,6 +50,7 @@ import type {
   ManagementRoleList,
   ManagementRoleRef,
   ManagementRoleSummary,
+  MyPermissions,
   OrgRef,
   OrganizationList,
   OrganizationPlanStatus,
@@ -64,6 +72,10 @@ import type {
   SchemaVersionRef,
   SchemaVersionSummary,
   SyncComponentResponse,
+  UploadLink,
+  UploadLinkCreated,
+  UploadLinkCreateRequest,
+  UploadLinkList,
 } from './models.js';
 import { resolveKey } from './models.js';
 import { managementPaths } from './paths.js';
@@ -208,6 +220,18 @@ export class ManagementClient {
   ): Promise<OrganizationSummary> {
     const key = resolveKey(orgKey);
     return this.request('PUT', `${this.paths.orgRoot(key)}/`, { jsonBody: payload });
+  }
+
+  /**
+   * Write the given fields of an organization and leave the rest alone. The
+   * response is the whole organization as stored.
+   */
+  async patchOrganization(
+    orgKey: OrgRef,
+    payload: Record<string, any>,
+  ): Promise<OrganizationSummary> {
+    const key = resolveKey(orgKey);
+    return this.request('PATCH', `${this.paths.orgRoot(key)}/`, { jsonBody: payload });
   }
 
   async listRegions(): Promise<RegionInfo[]> {
@@ -771,6 +795,24 @@ export class ManagementClient {
     });
   }
 
+  /**
+   * Write the given fields of a collection and leave the rest alone.
+   *
+   * `updateCollection` replaces the whole record; this does not. An omitted
+   * `parent` keeps the collection where it is, and `{ parent: null }` moves it
+   * to the root. The response is the whole collection as stored.
+   */
+  async patchCollection(
+    collectionKey: CollectionRef,
+    payload: Record<string, any>,
+  ): Promise<CollectionSummary> {
+    const key = resolveKey(collectionKey);
+    return this.request('PATCH', `${this.paths.collectionsTreeItem()}/`, {
+      params: { key },
+      jsonBody: payload,
+    });
+  }
+
   async deleteCollection(collectionKey: CollectionRef): Promise<void> {
     const key = resolveKey(collectionKey);
     await this.request('DELETE', `${this.paths.collectionsTreeItem()}/`, {
@@ -1242,6 +1284,18 @@ export class ManagementClient {
   ): Promise<ComponentSummary> {
     const key = resolveKey(componentKey);
     return this.request('PUT', `${this.paths.componentRoot(key)}/`, { jsonBody: payload });
+  }
+
+  /**
+   * Write the given fields of a component and leave the rest alone. The response
+   * is the whole component as stored.
+   */
+  async patchComponent(
+    componentKey: ComponentRef,
+    payload: Record<string, any>,
+  ): Promise<ComponentSummary> {
+    const key = resolveKey(componentKey);
+    return this.request('PATCH', `${this.paths.componentRoot(key)}/`, { jsonBody: payload });
   }
 
   async deleteComponent(componentKey: ComponentRef): Promise<void> {
@@ -1836,5 +1890,218 @@ export class ManagementClient {
     return this.updateEnvironmentProtection(orgKey, projectKey, envKey, {
       protectionLevel: 'none',
     });
+  }
+
+  // ------------------------------------------------------------------ //
+  // Files
+  // ------------------------------------------------------------------ //
+
+  /**
+   * List a files collection's upload links, newest first. `params` carries `limit` (at
+   * most 100), `offset` and `state`: `active`, `ended` or `all` (the default).
+   */
+  async listUploadLinks(
+    collectionKey: CollectionRef,
+    params?: Record<string, any>,
+  ): Promise<UploadLinkList> {
+    const key = resolveKey(collectionKey);
+    return this.request('GET', `${this.paths.uploadLinksRoot(key)}/`, { params });
+  }
+
+  /**
+   * Create an upload link: a hosted page where an end user adds files.
+   *
+   * The collection must be strict. Works with a user token or a Management API
+   * key of this environment. Read the link back with {@link getUploadLink}; the
+   * Flux upload status answers only the Flux key that started an upload, never
+   * a link made here.
+   *
+   * `upload_url` carries the link's token and is returned only by this call.
+   */
+  async createUploadLink(
+    collectionKey: CollectionRef,
+    request: UploadLinkCreateRequest,
+  ): Promise<UploadLinkCreated> {
+    const key = resolveKey(collectionKey);
+    return this.transport.request('POST', `${this.paths.uploadLinksRoot(key)}/`, {
+      jsonBody: { ...request, owner: resolveKey(request.owner) },
+      allowRetries: false,
+    });
+  }
+
+  /** Read one upload link with its sessions and the status of each file. */
+  async getUploadLink(collectionKey: CollectionRef, uploadId: string): Promise<UploadLink> {
+    const key = resolveKey(collectionKey);
+    return this.request('GET', `${this.paths.uploadLinkRoot(key, uploadId)}/`);
+  }
+
+  /**
+   * Revoke an upload link. Revoking a revoked link returns the same state. Files
+   * already uploaded through the link are not affected.
+   */
+  async revokeUploadLink(collectionKey: CollectionRef, uploadId: string): Promise<UploadLink> {
+    const key = resolveKey(collectionKey);
+    return this.request('POST', `${this.paths.uploadLinkRoot(key, uploadId)}/revoke/`);
+  }
+
+  /** Read a record's file: its verdict, the checks that ran and every finding. */
+  async getFileAnalysis(
+    collectionKey: CollectionRef,
+    resourceKey: ResourceRef,
+  ): Promise<FileRecordView> {
+    const root = this.fileRoot(collectionKey, resourceKey);
+    return this.request('GET', `${root}/analysis/`);
+  }
+
+  /**
+   * Release a file held for a reviewer.
+   *
+   * The answer's `outcome` says what happened; a publish that goes back through
+   * processing completes on its own. A file no reviewer holds is
+   * `409 file_not_in_review`, `file_not_ready` or `file_erased`.
+   */
+  async approveFile(
+    collectionKey: CollectionRef,
+    resourceKey: ResourceRef,
+  ): Promise<FileRecordView> {
+    const root = this.fileRoot(collectionKey, resourceKey);
+    return this.transport.request('POST', `${root}/approve/`, { allowRetries: false });
+  }
+
+  /** Reject a file held for a reviewer. Repeating it returns the same state. */
+  async rejectFile(
+    collectionKey: CollectionRef,
+    resourceKey: ResourceRef,
+  ): Promise<FileRecordView> {
+    const root = this.fileRoot(collectionKey, resourceKey);
+    return this.request('POST', `${root}/reject/`);
+  }
+
+  /**
+   * Analyze a file again under the collection's live policy.
+   *
+   * Accepted work runs in the background; a published generation keeps serving
+   * until the new one publishes. A `storage_only` collection answers
+   * `409 reanalysis_requires_agent_ready`. This is paid processing: a refusal over
+   * the plan throws {@link FilesQuotaExceededError}, a quota that cannot be read
+   * throws {@link FilesQuotaUnavailableError}, and over a budget is `429`.
+   */
+  async reanalyzeFile(
+    collectionKey: CollectionRef,
+    resourceKey: ResourceRef,
+  ): Promise<FileRecordView> {
+    const root = this.fileRoot(collectionKey, resourceKey);
+    return this.transport.request('POST', `${root}/reanalyze/`, { allowRetries: false });
+  }
+
+  /**
+   * Get a short-lived link to a record's original file.
+   *
+   * A state that cannot be downloaded now is a `409`: `detail.reason` of the
+   * thrown error names it. Check `warnings` before opening the file.
+   */
+  async getFileOriginal(
+    collectionKey: CollectionRef,
+    resourceKey: ResourceRef,
+  ): Promise<FileDownload> {
+    const root = this.fileRoot(collectionKey, resourceKey);
+    return this.request('GET', `${root}/file/original/`);
+  }
+
+  /**
+   * Get a short-lived link to a record's safe copy. It is an image-only PDF, or a PNG
+   * for an image: read `content_type`.
+   */
+  async getFileSafeCopy(
+    collectionKey: CollectionRef,
+    resourceKey: ResourceRef,
+  ): Promise<FileDownload> {
+    const root = this.fileRoot(collectionKey, resourceKey);
+    return this.request('GET', `${root}/file/safe-copy/`);
+  }
+
+  /** Get a short-lived link to the redacted PNG of one page. */
+  async getFilePage(
+    collectionKey: CollectionRef,
+    resourceKey: ResourceRef,
+    page: number,
+  ): Promise<FileDownload> {
+    const root = this.fileRoot(collectionKey, resourceKey);
+    return this.request('GET', `${root}/file/pages/${page}/`);
+  }
+
+  /**
+   * Read one page: its redacted image, what was withheld, its tables and the
+   * text an agent receives.
+   */
+  async getFilePageDetail(
+    collectionKey: CollectionRef,
+    resourceKey: ResourceRef,
+    page: number,
+  ): Promise<FilePageDetail> {
+    const root = this.fileRoot(collectionKey, resourceKey);
+    return this.request('GET', `${root}/file/pages/${page}/detail/`);
+  }
+
+  /** List a collection's blocked and rejected files, newest first. */
+  async listFileTombstones(
+    collectionKey: CollectionRef,
+    params?: Record<string, any>,
+  ): Promise<FileTombstoneList> {
+    const key = resolveKey(collectionKey);
+    return this.request('GET', `${this.paths.fileTombstonesRoot(key)}/`, { params });
+  }
+
+  /** Read a collection's live files policy. */
+  async getFilesPolicy(collectionKey: CollectionRef): Promise<FilesPolicy> {
+    const key = resolveKey(collectionKey);
+    return this.request('GET', `${this.paths.filesPolicyRoot(key)}/`);
+  }
+
+  /**
+   * Replace a collection's files policy with a new version.
+   *
+   * A full replacement: an omitted field takes its default. Sending the live
+   * body again creates no version.
+   */
+  async updateFilesPolicy(
+    collectionKey: CollectionRef,
+    payload: FilesPolicyBody,
+  ): Promise<FilesPolicy> {
+    const key = resolveKey(collectionKey);
+    return this.request('PUT', `${this.paths.filesPolicyRoot(key)}/`, { jsonBody: payload });
+  }
+
+  /**
+   * List the files held for a reviewer in this environment, newest first.
+   *
+   * `collection` narrows the queue to one collection; one the caller cannot read,
+   * or that does not exist, is an empty page. `params` carries `limit` (at most
+   * 100) and `offset`.
+   */
+  async listFileReviewQueue(options?: {
+    collection?: CollectionRef;
+    params?: Record<string, any>;
+  }): Promise<FileReviewQueue> {
+    const params = { ...options?.params };
+    if (options?.collection !== undefined) {
+      params.collection = resolveKey(options.collection);
+    }
+    return this.request('GET', `${this.paths.filesReviewRoot()}/`, { params });
+  }
+
+  /**
+   * Read what the authenticated caller may do in this environment.
+   *
+   * Works for a user token and for a Management API key of this environment. A caller
+   * with no grants at all is a `403`; a key of another environment is a
+   * `404 environment_not_found`.
+   */
+  async getMyPermissions(): Promise<MyPermissions> {
+    return this.request('GET', `${this.paths.myPermissionsRoot()}/`);
+  }
+
+  private fileRoot(collectionKey: CollectionRef, resourceKey: ResourceRef): string {
+    return this.paths.fileRoot(resolveKey(collectionKey), resolveKey(resourceKey));
   }
 }
