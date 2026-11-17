@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `RevisionSummary.schema_version` is `string | null`: it is `null` when the schema version is gone.
 
+### Fixed
+
+- An API error whose body carries only `code` (for example a missing upload link) reports it as `errorCode`.
+
 ## [0.6.1] - 2026-09-10
 
 ### Fixed
