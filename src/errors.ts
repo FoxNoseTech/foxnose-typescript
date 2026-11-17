@@ -255,6 +255,72 @@ export class UpstreamError extends FoxnoseAPIError {
   }
 }
 
+/**
+ * Raised on HTTP 404 `webhook_endpoint_not_found`: no endpoint with this id in the
+ * environment.
+ */
+export class WebhookEndpointNotFoundError extends FoxnoseAPIError {
+  constructor(options: APIErrorOptions) {
+    super(options);
+    this.name = 'WebhookEndpointNotFoundError';
+  }
+}
+
+/**
+ * Raised on HTTP 404 `webhook_event_not_found`: no such event in the environment
+ * within the last 30 days.
+ */
+export class WebhookEventNotFoundError extends FoxnoseAPIError {
+  constructor(options: APIErrorOptions) {
+    super(options);
+    this.name = 'WebhookEventNotFoundError';
+  }
+}
+
+/**
+ * Raised on HTTP 409 `limit_exceeded`: the environment already has the most webhook
+ * endpoints it can have (20).
+ */
+export class WebhookEndpointLimitExceededError extends FoxnoseAPIError {
+  constructor(options: APIErrorOptions) {
+    super(options);
+    this.name = 'WebhookEndpointLimitExceededError';
+  }
+}
+
+/**
+ * Raised on HTTP 409 `endpoint_not_active`: the endpoint is paused, disabled or
+ * deleted, so a test event, a recovery or a redelivery cannot go to it.
+ */
+export class WebhookEndpointNotActiveError extends FoxnoseAPIError {
+  /** The endpoint's state (`paused`, `disabled` or `deleted`) when the call named it. */
+  readonly reason?: string;
+  /** Endpoints a redelivery without `endpoint_id` passed over, each with `endpoint_id` and `reason`. */
+  readonly skipped: unknown[];
+
+  constructor(options: APIErrorOptions & { reason?: string; skipped?: unknown[] }) {
+    super(options);
+    this.name = 'WebhookEndpointNotActiveError';
+    this.reason = options.reason;
+    this.skipped = options.skipped ?? [];
+  }
+}
+
+/**
+ * Raised on HTTP 409 `endpoint_not_subscribed`: the endpoint's current event types or
+ * collection filter do not cover the event.
+ */
+export class WebhookEndpointNotSubscribedError extends FoxnoseAPIError {
+  /** Endpoints a redelivery without `endpoint_id` passed over, each with `endpoint_id` and `reason`. */
+  readonly skipped: unknown[];
+
+  constructor(options: APIErrorOptions & { skipped?: unknown[] }) {
+    super(options);
+    this.name = 'WebhookEndpointNotSubscribedError';
+    this.skipped = options.skipped ?? [];
+  }
+}
+
 /** Returns true only for a plain (non-null, non-array) object. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -379,6 +445,35 @@ export function buildAPIError(options: APIErrorOptions): FoxnoseAPIError {
       ...options,
       errors,
       errorsTruncated: d.errors_truncated === true,
+    });
+  }
+
+  if (statusCode === 404 && errorCode === 'webhook_endpoint_not_found') {
+    return new WebhookEndpointNotFoundError(options);
+  }
+
+  if (statusCode === 404 && errorCode === 'webhook_event_not_found') {
+    return new WebhookEventNotFoundError(options);
+  }
+
+  if (statusCode === 409 && errorCode === 'limit_exceeded') {
+    return new WebhookEndpointLimitExceededError(options);
+  }
+
+  if (statusCode === 409 && errorCode === 'endpoint_not_active') {
+    const d = isPlainObject(detail) ? detail : {};
+    return new WebhookEndpointNotActiveError({
+      ...options,
+      reason: typeof d.reason === 'string' ? d.reason : undefined,
+      skipped: Array.isArray(d.skipped) ? d.skipped : undefined,
+    });
+  }
+
+  if (statusCode === 409 && errorCode === 'endpoint_not_subscribed') {
+    const d = isPlainObject(detail) ? detail : {};
+    return new WebhookEndpointNotSubscribedError({
+      ...options,
+      skipped: Array.isArray(d.skipped) ? d.skipped : undefined,
     });
   }
 
