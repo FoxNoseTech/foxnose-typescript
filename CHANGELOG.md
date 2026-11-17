@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-17
+
 ### Added
 
 - **FoxNose Files** on `ManagementClient`, with typed responses:
@@ -29,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `RevisionSummary.schema_version` is `string | null`: it is `null` when the schema version is gone.
+
+### Fixed
+
+- An API error whose body carries only `code` (for example a missing upload link) reports it as `errorCode`.
 
 ## [0.6.1] - 2026-09-10
 
